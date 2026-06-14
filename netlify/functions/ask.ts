@@ -98,6 +98,10 @@ export default async (req: Request, _context: Context) => {
   const route = classifyQuestion(question);
   const evidence = buildEvidence(question, route);
 
+  if (route === "financial_metric" && !hasUsableFinancialValue(evidence)) {
+    return Response.json(unknown(["reviewed usable financial_facts"]));
+  }
+
   if (!OPENAI_SYNTHESIS_ENABLED || !process.env.OPENAI_API_KEY) {
     if (evidence.sourceChunks.length && ["credit_summary", "source_lookup", "other"].includes(route)) {
       return Response.json(snippetOnlyAnswer(route, evidence));
@@ -351,6 +355,10 @@ function dedupeCitations(citations: Citation[]): Citation[] {
     out.push(item);
   }
   return out;
+}
+
+function hasUsableFinancialValue(evidence: EvidencePacket): boolean {
+  return evidence.structuredFacts.some((fact) => isAnswerUsableFinancialFact(fact) && fact.value !== null);
 }
 
 function isAnswerUsableFinancialFact(fact: unknown): fact is Record<string, unknown> {

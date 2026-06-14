@@ -49,7 +49,7 @@ const processed = sources.filter((source) => ["processed", "indexed", "verified"
 const downloaded = sources.filter((source) => source.processing_status === "downloaded").length;
 
 if (!/Goldborne Capital Intelligence Platform/i.test(page)) failures.push("homepage is missing Goldborne Capital Intelligence Platform branding");
-if (!/GAIL[’']?S/i.test(page)) failures.push("homepage is missing GAIL'S workspace signal");
+if (!/GAIL(?:[’\']|&#x27;)?S/i.test(page)) failures.push("homepage is missing GAIL'S workspace signal");
 if (/AI Dataroom Assistant/i.test(page)) failures.push("homepage still exposes old AI Dataroom Assistant shell");
 if (/0 indexed sources/i.test(page)) failures.push("homepage still renders '0 indexed sources'");
 

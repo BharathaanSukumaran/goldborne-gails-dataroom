@@ -2,6 +2,8 @@
 
 AI dataroom assistant for GAIL'S LIMITED / Gail's Bakery, company number `06055393`.
 
+Live demo: https://goldborne-gails-dataroom.netlify.app
+
 The project combines a curated public dataroom, a FastAPI backend, and a Next.js frontend. The assistant is designed to answer credit and diligence questions with citations, route exact financial/legal questions through structured facts, and say when the dataroom does not contain enough evidence.
 
 ## Repository Layout

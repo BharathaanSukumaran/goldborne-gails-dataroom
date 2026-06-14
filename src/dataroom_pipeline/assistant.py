@@ -5,6 +5,7 @@ from typing import Any
 
 from .paths import DB_PATH
 from .storage import connect, rows
+from .llm_client import synthesize
 
 
 def answer_question(question: str, db_path=DB_PATH) -> dict[str, Any]:
@@ -136,14 +137,27 @@ def _credit_answer(conn: sqlite3.Connection) -> dict[str, Any]:
     charge_text = "; ".join(f"{c['charge_code']} held by {c['holder']}" for c in charges) or "no registered charges in the normalized dataset"
     owner_text = "; ".join(f"{o['owner_name']} ({o['percentage_band']})" for o in owners) or "ownership not populated"
     risks = [event["risk_relevance"] for event in events if event.get("risk_relevance")]
-    answer = (
+    deterministic_answer = (
         "Credit summary: Gail's is represented in the dataroom as an active UK bakery/cafe operator with ownership linked to "
         f"{owner_text}. The current normalized charges dataset shows {charge_text}. "
         "Key lender risks from the current dataroom are: "
         + ("; ".join(risks) if risks else "insufficient event evidence has been normalized.")
         + " Exact financial leverage and EBITDA commentary should remain provisional until the source accounts PDFs are added and validated."
     )
-    return {"answer": answer, "citations": citations, "route": "structured_plus_events"}
+    source_context = {
+        "ownership": owners,
+        "charges": charges,
+        "events": events,
+        "deterministic_answer": deterministic_answer,
+    }
+    llm_answer = synthesize(
+        "You are a credit dataroom assistant. Use only the supplied structured context. "
+        "Do not invent missing financial values. Keep the answer concise and lender-focused.",
+        "Draft a credit summary from this context:\n" + str(source_context),
+    )
+    if llm_answer:
+        return {"answer": llm_answer, "citations": citations, "route": "structured_plus_llm_synthesis"}
+    return {"answer": deterministic_answer, "citations": citations, "route": "structured_plus_events"}
 
 
 def _citations(rows_: list[dict[str, Any]]) -> list[dict[str, str]]:

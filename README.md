@@ -48,6 +48,50 @@ The first implementation includes a seeded canonical dataset so the UI and assis
 
 The brief rewards the architecture and decision quality more than a brittle crawler. Manual intake keeps the legal/copyright and paywall boundary clear, while still proving the important platform mechanics: provenance, validation, normalization, and repeatability.
 
+
+## Assistant Runtime And Model Options
+
+The assistant defaults to deterministic structured answers, so no LLM token is used unless explicitly enabled. This protects exact financial and charges answers from hallucination and avoids accidental API spend.
+
+To inspect runtime config:
+
+```bash
+python -m dataroom_pipeline.cli llm-status
+```
+
+Optional providers are configured through `.env` or deployment secrets:
+
+```bash
+ASSISTANT_USE_LLM=false
+LLM_PROVIDER=deterministic
+```
+
+Free local option with no API key or card:
+
+```bash
+ollama pull llama3.2:3b
+ASSISTANT_USE_LLM=true
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=llama3.2:3b
+```
+
+OpenAI and Gemini are also supported through `OPENAI_API_KEY` and `GEMINI_API_KEY`, but should be enabled only when intended.
+
+## OpenClaw Integration
+
+This repository includes a workspace OpenClaw skill at `skills/gails-dataroom/SKILL.md`. OpenClaw loads workspace skills from `skills/`, so an OpenClaw agent working in this repo can operate the dataroom through the CLI.
+
+Useful commands for OpenClaw or a terminal demo:
+
+```bash
+python -m dataroom_pipeline.cli run
+python -m dataroom_pipeline.cli validate
+python -m dataroom_pipeline.cli ask "What charges are registered against the company?"
+python -m dataroom_pipeline.cli llm-status
+```
+
+The Streamlit frontend remains the primary browser demo. OpenClaw is positioned as an agentic operating layer over the same normalized pipeline, not as a replacement for the UI.
+
 ## GitHub
 
 Keep the repository private during development. Make it public only for final submission.

@@ -12,6 +12,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from dataroom_pipeline.assistant import answer_question
+from dataroom_pipeline.llm_client import provider_status
 from dataroom_pipeline.paths import DB_PATH, REPORTS_DIR
 from dataroom_pipeline.pipeline import run_pipeline
 from dataroom_pipeline.storage import connect, rows
@@ -43,6 +44,17 @@ top[0].metric("Company", summary.get("company", {}).get("company_number", "06055
 top[1].metric("Documents", summary.get("document_count", 0))
 top[2].metric("Processed", summary.get("processed_document_count", 0))
 top[3].metric("Open QA items", summary.get("open_issue_count", 0))
+
+llm_status = provider_status()
+with st.expander("Assistant runtime", expanded=False):
+    st.write(llm_status["reason"])
+    st.json({
+        "provider": llm_status["provider"],
+        "model": llm_status["model"],
+        "enabled": llm_status["enabled"],
+        "ready": llm_status["ready"],
+        "free_local_option": "Set LLM_PROVIDER=ollama and ASSISTANT_USE_LLM=true with a local Ollama model.",
+    })
 
 conn = connect(DB_PATH)
 

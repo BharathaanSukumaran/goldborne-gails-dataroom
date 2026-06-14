@@ -12,3 +12,5 @@ data/index/
 reports/
 Brief
 !.gitkeep
+*.egg-info/
+src/*.egg-info/

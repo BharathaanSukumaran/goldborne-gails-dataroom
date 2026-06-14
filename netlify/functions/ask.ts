@@ -79,7 +79,7 @@ const responseSchema = {
         required: ["sourceId", "title", "page", "snippet"]
       }
     },
-    factsUsed: { type: "array", items: {} },
+    factsUsed: { type: "array", items: { type: "object", additionalProperties: true } },
     missingInformation: { type: "array", items: { type: "string" } },
     confidence: { type: "string", enum: ["high", "medium", "low"] }
   },

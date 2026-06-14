@@ -1,0 +1,24 @@
+[project]
+name = "goldborne-gails-dataroom"
+version = "0.1.0"
+description = "Pipeline-first dataroom and AI assistant demo for Gail's Limited"
+requires-python = ">=3.12"
+dependencies = [
+  "beautifulsoup4>=4.12.0",
+  "pandas>=2.2.0",
+  "pdfplumber>=0.11.0",
+  "pymupdf>=1.24.0",
+  "streamlit>=1.36.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+]
+
+[project.scripts]
+dataroom = "dataroom_pipeline.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

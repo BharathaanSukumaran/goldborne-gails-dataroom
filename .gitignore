@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.streamlit/secrets.toml
+.pytest_cache/
+.mypy_cache/
+data/raw/
+data/processed/
+data/normalized/
+data/index/
+reports/
+Brief
+!.gitkeep

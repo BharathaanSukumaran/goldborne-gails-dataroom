@@ -11,8 +11,10 @@ const config: Config = {
       colors: {
         ink: "#151712",
         paper: "#fbfaf6",
+        platform: "#f5f3ee",
         line: "#dedbd2",
         moss: "#556b2f",
+        gold: "#d7b46a",
         copper: "#9a5f33",
         sky: "#446b86"
       },

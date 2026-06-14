@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -14,10 +15,12 @@ CREATE TABLE IF NOT EXISTS sources (
   included_reason TEXT NOT NULL, processing_status TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS financial_facts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, period_end TEXT NOT NULL, metric TEXT NOT NULL,
+  id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'gails-limited',
+  period_end TEXT NOT NULL, metric TEXT NOT NULL,
   value_minor_units INTEGER, currency TEXT NOT NULL DEFAULT 'GBP', unit TEXT NOT NULL DEFAULT 'pence',
   reported_or_computed TEXT NOT NULL, formula TEXT, source_document_id TEXT NOT NULL, source_page INTEGER,
   source_quote TEXT NOT NULL, extraction_confidence TEXT NOT NULL, reviewed INTEGER NOT NULL DEFAULT 0,
+  used_in_answers INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY(source_document_id) REFERENCES sources(source_id)
 );
 CREATE TABLE IF NOT EXISTS charges (
@@ -55,6 +58,7 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _ensure_columns(conn)
     return conn
 
 def rows(query: str, params: tuple = ()) -> list[dict]:
@@ -71,12 +75,24 @@ def seed_database() -> None:
                 s["source_id"], s["title"], s["category"], s["issuer"], s["retrieved_at"], s["source_url"],
                 s["local_path"], s["included_reason"], s["processing_status"]
             ))
-        for metric in ["revenue", "EBITDA", "debt"]:
+        for fact in _load_financial_facts():
             conn.execute("""INSERT INTO financial_facts
-              (period_end, metric, value_minor_units, currency, unit, reported_or_computed, formula, source_document_id, source_page, source_quote, extraction_confidence, reviewed)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-                "2025-02-28", metric, None, "GBP", "pence", "unknown", None, "ch-parent-accounts-2025", None,
-                "Financial value unavailable until the source accounts PDF is ingested and human-reviewed.", "pending_source_pdf", 0
+              (workspace_id, period_end, metric, value_minor_units, currency, unit, reported_or_computed, formula, source_document_id, source_page, source_quote, extraction_confidence, reviewed, used_in_answers)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+                fact.get("workspaceId", "gails-limited"),
+                fact["periodEnd"],
+                str(fact["metric"]).lower(),
+                _minor_units(fact.get("value")),
+                fact.get("currency", "GBP"),
+                fact.get("unit", "GBP"),
+                fact.get("reportedOrComputed", "unavailable"),
+                fact.get("formula"),
+                fact["sourceId"],
+                fact.get("page"),
+                fact["quote"],
+                str(fact.get("extractionConfidence", "0")),
+                1 if fact.get("reviewed") else 0,
+                1 if fact.get("usedInAnswers") else 0,
             ))
         for charge in [
           ("0605 5393 0006", "2022-06-06", "outstanding", "Glas Trust Corporation Limited", "ch-charge-0006"),
@@ -101,3 +117,31 @@ def seed_database() -> None:
                 text = f"{s['title']}\nCategory: {s['category']}\nReason: {s['included_reason']}\nNotes: {s.get('notes') or ''}"
             conn.execute("INSERT INTO document_chunks VALUES (?, ?, ?, ?)", (s["source_id"] + ":1", s["source_id"], 1, text[:4000]))
         conn.commit()
+
+
+def _load_financial_facts() -> list[dict]:
+    path = PROJECT_ROOT / "backend" / "data" / "financial_facts.json"
+    if not path.exists():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    facts = payload.get("facts", payload)
+    return facts if isinstance(facts, list) else []
+
+
+def _minor_units(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        decimal = Decimal(str(value).replace(",", ""))
+    except (InvalidOperation, ValueError):
+        return None
+    return int((decimal * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def _ensure_columns(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(financial_facts)")}
+    if "workspace_id" not in columns:
+        conn.execute("ALTER TABLE financial_facts ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'gails-limited'")
+    if "used_in_answers" not in columns:
+        conn.execute("ALTER TABLE financial_facts ADD COLUMN used_in_answers INTEGER NOT NULL DEFAULT 0")
+    conn.commit()

@@ -20,6 +20,12 @@ export function SourceBrowser({ sources, loading, error }: SourceBrowserProps) {
     [sources]
   );
 
+  const statusSummary = useMemo(() => {
+    const pending = sources.filter((source) => (source.source_status ?? source.status) === "pending").length;
+    const processed = sources.filter((source) => (source.source_status ?? source.status) === "processed").length;
+    return `${sources.length} sources: ${processed} processed, ${pending} pending`;
+  }, [sources]);
+
   const filteredSources = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -31,11 +37,12 @@ export function SourceBrowser({ sources, loading, error }: SourceBrowserProps) {
   }, [category, query, sources]);
 
   return (
-    <aside className="flex min-h-0 flex-col border-t border-line bg-paper/80 lg:border-l lg:border-t-0">
+    <aside className="flex h-full min-h-0 flex-col bg-paper/80">
       <div className="border-b border-line p-5">
         <div>
-          <h2 className="text-base font-semibold text-ink">Dataroom</h2>
-          <p className="mt-1 text-sm text-ink/62">{sources.length} indexed sources</p>
+          <p className="text-xs font-semibold uppercase text-moss">Sources</p>
+          <h2 className="mt-1 text-base font-semibold text-ink">Dataroom evidence</h2>
+          <p className="mt-1 text-sm text-ink/62">{statusSummary} for GAIL&apos;S Limited</p>
         </div>
         <label className="mt-4 flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2">
           <Search size={17} className="text-ink/46" aria-hidden="true" />

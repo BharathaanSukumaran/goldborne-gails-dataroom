@@ -17,7 +17,12 @@ export function SourceCard({ source, compact = false }: SourceCardProps) {
         : undefined;
   const page = "page" in source ? source.page : undefined;
   const snippet = "snippet" in source ? source.snippet : undefined;
-  const status = "processing_status" in source ? source.processing_status : undefined;
+  const status =
+    "source_status" in source
+      ? source.source_status
+      : "processing_status" in source
+        ? source.processing_status
+        : undefined;
   const reason = "included_reason" in source ? source.included_reason : undefined;
 
   return (

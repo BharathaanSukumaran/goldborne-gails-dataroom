@@ -2,9 +2,11 @@ import pytest
 
 from backend.app.retrieval import (
     DocumentPage,
+    DocumentChunk,
     LocalKeywordSearchBackend,
     OpenAIFileSearchBackend,
     chunk_document_pages,
+    filter_manifest_backed_chunks,
     search_docs,
 )
 
@@ -109,3 +111,14 @@ def test_openai_file_search_adapter_rejects_results_without_source_id():
 
     with pytest.raises(ValueError, match="source_id"):
         backend.search("anything")
+
+
+def test_filter_manifest_backed_chunks_drops_unknown_source_ids():
+    chunks = [
+        DocumentChunk(chunk_id="valid:1", source_id="valid-source", title="Valid", text="Supported snippet."),
+        DocumentChunk(chunk_id="missing:1", source_id="missing-source", title="Missing", text="Unsupported snippet."),
+    ]
+
+    backed = filter_manifest_backed_chunks(chunks, [{"source_id": "valid-source"}])
+
+    assert [chunk.source_id for chunk in backed] == ["valid-source"]

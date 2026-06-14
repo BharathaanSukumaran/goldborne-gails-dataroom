@@ -37,7 +37,7 @@ def test_ask_charges_uses_structured_facts_and_citations():
     response = client.post("/ask", json={"question": "What charges are registered against the company and who holds them?"})
     body = response.json()
     assert response.status_code == 200
-    assert body["answer_type"] == "structured"
+    assert body["answer_type"] == "charges_security"
     assert "Glas Trust Corporation Limited" in body["answer"]
     assert "0605 5393 0006" in body["answer"]
     assert body["citations"]
@@ -58,3 +58,24 @@ def test_evals_run():
     assert response.status_code == 200
     assert body["results"]
     assert body["passed"] is True
+
+
+def test_ask_narrative_uses_only_retrieved_manifest_backed_snippets(monkeypatch):
+    captured = []
+
+    def fake_synthesis(question, evidence):
+        captured.append(evidence)
+        return None
+
+    monkeypatch.setattr("backend.app.main.synthesize_with_openai", fake_synthesis)
+    response = client.post("/ask", json={"question": "What are the key expansion risks?"})
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["answer_type"] == "credit_summary"
+    assert body["citations"]
+    manifest_ids = {source["source_id"] for source in client.get("/sources").json()["sources"]}
+    assert {citation["source_id"] for citation in body["citations"]}.issubset(manifest_ids)
+    assert captured
+    assert all("snippet" in item and "source_id" in item for item in captured[0])
+    assert all(item["source_id"] in manifest_ids for item in captured[0])

@@ -36,6 +36,18 @@ REQUIRED_CATEGORIES = [
     "news",
 ]
 
+PROCESSED_PATH_BY_SOURCE_ID = {
+    "ch-profile-06055393": "dataroom/processed/ch_profile_06055393.md",
+    "ch-filing-history-06055393": "dataroom/processed/ch_filing_history_06055393.md",
+    "ch-charges-register-06055393": "dataroom/processed/ch_charges_register.md",
+    "ch-charge-0006": "dataroom/processed/ch_charge_0006.md",
+    "ch-charge-0005": "dataroom/processed/ch_charge_0005.md",
+    "ch-officers-06055393": "dataroom/processed/ch_officers_06055393.md",
+    "ch-psc-06055393": "dataroom/processed/ch_psc_06055393.md",
+    "news-expansion-2025-placeholder": "dataroom/processed/guardian_expansion_2025.md",
+    "news-community-context-2024-placeholder": "dataroom/processed/guardian_community_2024.md",
+}
+
 
 def source(
     *,
@@ -54,6 +66,7 @@ def source(
     pages: int | None = None,
     notes: str = "",
     retrieved_at: str,
+    source_status: str = "pending",
 ) -> dict[str, Any]:
     return {
         "source_id": source_id,
@@ -71,10 +84,53 @@ def source(
         "period_end": period_end,
         "pages": pages,
         "notes": notes,
+        "source_status": source_status,
     }
 
 
-def build_manifest(generated_at: str) -> dict[str, Any]:
+def load_existing_sources(path: Path) -> dict[str, dict[str, Any]]:
+    if not path.exists():
+        return {}
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return {
+        source["source_id"]: source
+        for source in manifest.get("sources", [])
+        if isinstance(source, dict) and isinstance(source.get("source_id"), str)
+    }
+
+
+def source_status_for(processing_status: str) -> str:
+    if processing_status == "verified":
+        return "verified"
+    if processing_status == "processed":
+        return "processed"
+    return "pending"
+
+
+def refresh_source_readiness(source_item: dict[str, Any], existing: dict[str, Any] | None) -> dict[str, Any]:
+    """Preserve curated processed sources while keeping missing accounts pending."""
+    processed_path = (existing or {}).get("processed_path") or PROCESSED_PATH_BY_SOURCE_ID.get(source_item["source_id"])
+    if processed_path and (ROOT / processed_path).exists():
+        source_item["processed_path"] = processed_path
+        if (existing or {}).get("processing_status") == "verified":
+            source_item["processing_status"] = "verified"
+        else:
+            source_item["processing_status"] = "processed"
+        source_item["source_status"] = source_status_for(source_item["processing_status"])
+        return source_item
+
+    if (ROOT / source_item["local_path"]).exists():
+        source_item["processing_status"] = "downloaded"
+        source_item["source_status"] = source_status_for(source_item["processing_status"])
+    else:
+        source_item["source_status"] = source_status_for(source_item["processing_status"])
+    return source_item
+
+
+def build_manifest(generated_at: str, existing_sources: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
     ch_base = COMPANY["companies_house_url"]
     sources = [
         source(
@@ -251,6 +307,12 @@ def build_manifest(generated_at: str) -> dict[str, Any]:
             retrieved_at=generated_at,
         ),
     ]
+    existing_sources = existing_sources or {}
+    sources = [
+        refresh_source_readiness(item, existing_sources.get(item["source_id"]))
+        for item in sources
+    ]
+
     return {
         "schema_version": "1.0",
         "generated_at": generated_at,
@@ -259,7 +321,7 @@ def build_manifest(generated_at: str) -> dict[str, Any]:
             "required_categories": REQUIRED_CATEGORIES,
             "covered_categories": sorted({item["category"] for item in sources}),
             "known_gaps": [
-                "PDF documents are referenced but not yet downloaded into dataroom/raw/companies_house.",
+                "Latest three parent consolidated accounts are metadata-registered; financial values remain unavailable until the PDFs are processed and reviewed.",
                 "Curated news items are placeholders pending manual article capture and licensing-safe excerpts.",
                 "Financial values must remain unverified until the parent consolidated accounts PDFs are parsed and reviewed.",
             ],
@@ -309,7 +371,7 @@ The manifest intentionally uses placeholders for curated news because automated 
 
 ## Processing policy
 
-Keep `processing_status` as `pending_download` until the raw HTML/PDF is present at `local_path`. Move to `downloaded` when present, `processed` when text/chunks have been extracted into `dataroom/processed/`, and `verified` only after facts used for answers have been checked against the source page/PDF.
+Keep `processing_status` as `pending_download` until the raw HTML/PDF is present at `local_path`. Move to `downloaded` when present, `processed` when text/chunks have been extracted into `dataroom/processed/`, and `verified` only after facts used for answers have been checked against the source page/PDF. `source_status` is the UI-friendly roll-up: `pending`, `processed`, or `verified`; downloaded but unprocessed files remain `pending`.
 """,
         encoding="utf-8",
     )
@@ -325,7 +387,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    manifest = build_manifest(args.generated_at)
+    manifest = build_manifest(args.generated_at, load_existing_sources(args.output))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     args.notes_output.parent.mkdir(parents=True, exist_ok=True)

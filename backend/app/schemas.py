@@ -12,11 +12,12 @@ class Citation(BaseModel):
     snippet: str | None = None
 
 class AskRequest(BaseModel):
+    workspaceId: str | None = None
     question: str = Field(min_length=1)
 
 class StructuredAnswer(BaseModel):
     answer: str
-    answer_type: Literal["structured", "retrieval", "hybrid", "unknown"]
+    answer_type: Literal["structured", "retrieval", "hybrid", "financial_metric", "charges_security", "ownership_management", "credit_summary", "source_lookup", "unknown", "other"]
     facts_used: list[dict] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
     missing_information: list[str] = Field(default_factory=list)

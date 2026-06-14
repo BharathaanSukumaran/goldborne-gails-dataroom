@@ -18,7 +18,7 @@
       "id": "brief_charges_have_holder_status_and_sources",
       "question": "What charges are registered against the company and who holds them?",
       "expect": {
-        "answer_type_any_of": ["charges", "structured", "unknown"],
+        "answer_type_any_of": ["charges", "charges_security", "structured", "unknown"],
         "requires_citations": true,
         "must_not_contain": ["no charges", "none registered"]
       }
@@ -27,7 +27,7 @@
       "id": "brief_lender_risks_are_sourced_or_unknown",
       "question": "What are the key risks for a lender?",
       "expect": {
-        "answer_type_any_of": ["retrieval", "hybrid", "narrative", "unknown"],
+        "answer_type_any_of": ["retrieval", "hybrid", "narrative", "credit_summary", "unknown"],
         "requires_citations": true,
         "forbid_approximation_words": true
       }
@@ -36,7 +36,7 @@
       "id": "brief_credit_summary_is_sourced_or_unknown",
       "question": "Draft a short credit summary of the business.",
       "expect": {
-        "answer_type_any_of": ["retrieval", "hybrid", "narrative", "unknown"],
+        "answer_type_any_of": ["retrieval", "hybrid", "narrative", "credit_summary", "unknown"],
         "requires_citations": true,
         "forbid_approximation_words": true
       }

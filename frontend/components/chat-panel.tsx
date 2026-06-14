@@ -9,8 +9,8 @@ import { SourceCard } from "./source-card";
 const suggestedQuestions = [
   "What was revenue and EBITDA in the last reported year?",
   "What charges are registered against the company and who holds them?",
-  "What are the key risks for a lender?",
-  "Draft a short credit summary of the business."
+  "Summarize ownership and management signals.",
+  "Draft a lender-focused credit summary."
 ];
 
 type Message = {
@@ -26,7 +26,7 @@ const initialMessage: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Ask about Gail's Limited financials, charges, ownership, management, news, or lender risks. Answers are grounded in dataroom sources where the backend has evidence."
+    "Ask about the selected GAIL'S Limited workspace: financials, charges, ownership, management, news, or lender risks. Answers are grounded in dataroom sources where the backend has evidence."
 };
 
 export function ChatPanel() {
@@ -84,17 +84,15 @@ export function ChatPanel() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-white">
+    <section className="flex h-full min-h-0 flex-1 flex-col bg-white">
       <header className="border-b border-line px-5 py-4 sm:px-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-moss">
-              Gail&apos;s Limited
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold text-ink">AI Dataroom Assistant</h1>
+            <p className="text-xs font-semibold uppercase text-moss">AI Analyst</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">Evidence-backed diligence chat</h2>
           </div>
           <div className="rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink/68">
-            Sources required for substantive claims
+            Workspace: GAIL&apos;S Limited
           </div>
         </div>
       </header>
@@ -151,7 +149,7 @@ export function ChatPanel() {
                   void submitQuestion();
                 }
               }}
-              placeholder="Ask a question about the dataroom"
+              placeholder="Ask the AI analyst about this workspace"
               aria-label="Question"
             />
             <button

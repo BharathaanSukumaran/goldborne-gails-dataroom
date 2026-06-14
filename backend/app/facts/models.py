@@ -5,16 +5,22 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Literal
 
 
-ReportedOrComputed = Literal["reported", "computed", "unknown"]
+ReportedOrComputed = Literal["reported", "computed", "unknown", "unavailable"]
 
 MONEY_METRICS = {
     "revenue",
+    "turnover",
     "ebitda",
+    "profit",
     "debt",
+    "borrowings",
+    "cash",
     "operating_profit",
+    "profit_before_tax",
     "depreciation",
     "amortisation",
     "impairment",
+    "net_assets",
 }
 
 
@@ -49,9 +55,10 @@ class MoneyAmount:
         return f"{symbol}{self.to_major_decimal():,.2f}"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FinancialFact:
-    period_end: str
+    workspace_id: str = "gails-limited"
+    period_end: str = ""
     metric: str
     value: MoneyAmount | None
     unit: str
@@ -62,8 +69,11 @@ class FinancialFact:
     source_quote: str
     extraction_confidence: Decimal
     reviewed: bool
+    used_in_answers: bool = False
 
     def __post_init__(self) -> None:
+        if not self.workspace_id:
+            raise ValueError("workspace_id is required")
         if self.metric in MONEY_METRICS and self.value is not None and not isinstance(self.value, MoneyAmount):
             raise TypeError("money facts must use MoneyAmount integer minor units")
         if isinstance(self.extraction_confidence, float):
@@ -72,9 +82,15 @@ class FinancialFact:
         if confidence < Decimal("0") or confidence > Decimal("1"):
             raise ValueError("extraction_confidence must be between 0 and 1")
         object.__setattr__(self, "extraction_confidence", confidence)
-        if self.reported_or_computed not in {"reported", "computed", "unknown"}:
-            raise ValueError("reported_or_computed must be reported, computed, or unknown")
+        if self.reported_or_computed not in {"reported", "computed", "unknown", "unavailable"}:
+            raise ValueError("reported_or_computed must be reported, computed, unknown, or unavailable")
         if self.reported_or_computed == "computed" and not self.formula:
             raise ValueError("computed facts require a formula")
-        if self.reported_or_computed != "unknown" and self.value is None:
+        if self.reported_or_computed not in {"unknown", "unavailable"} and self.value is None:
             raise ValueError("reported or computed facts require a value")
+        if self.used_in_answers and not self.reviewed:
+            object.__setattr__(self, "used_in_answers", False)
+
+    @property
+    def usable_in_answers(self) -> bool:
+        return self.reviewed and self.used_in_answers

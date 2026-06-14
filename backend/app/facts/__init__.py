@@ -3,11 +3,12 @@
 from .answers import build_financial_answer
 from .ebitda import resolve_ebitda
 from .models import FinancialFact, MoneyAmount
-from .repository import FinancialFactsRepository
+from .repository import FinancialFactsRepository, load_financial_facts_json
 
 __all__ = [
     "FinancialFact",
     "FinancialFactsRepository",
+    "load_financial_facts_json",
     "MoneyAmount",
     "build_financial_answer",
     "resolve_ebitda",

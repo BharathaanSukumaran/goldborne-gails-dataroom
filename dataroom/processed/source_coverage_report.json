@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-14T22:34:55Z",
+  "generated_at": "2026-06-14T23:34:57Z",
   "company": {
     "legal_name": "GAIL'S LIMITED",
     "company_number": "06055393",
@@ -17,8 +17,12 @@
     "ownership": 1
   },
   "processing_status_counts": {
-    "pending_download": 10,
-    "pending_manual_curation": 2
+    "downloaded": 3,
+    "processed": 9
+  },
+  "source_status_counts": {
+    "pending": 3,
+    "processed": 9
   },
   "required_categories_missing": [],
   "latest_three_accounts": [
@@ -27,21 +31,24 @@
       "period_end": "2025-02-28",
       "filed_at": "2025-11-27",
       "pages": 55,
-      "processing_status": "pending_download"
+      "processing_status": "downloaded",
+      "source_status": "pending"
     },
     {
       "source_id": "ch-parent-accounts-2024",
       "period_end": "2024-02-29",
       "filed_at": "2024-11-25",
       "pages": 58,
-      "processing_status": "pending_download"
+      "processing_status": "downloaded",
+      "source_status": "pending"
     },
     {
       "source_id": "ch-parent-accounts-2023",
       "period_end": "2023-02-28",
       "filed_at": "2023-11-28",
       "pages": 49,
-      "processing_status": "pending_download"
+      "processing_status": "downloaded",
+      "source_status": "pending"
     }
   ],
   "companies_house_sources": [
@@ -60,224 +67,151 @@
     "news-expansion-2025-placeholder",
     "news-community-context-2024-placeholder"
   ],
-  "issues": [
-    {
-      "source_id": "ch-profile-06055393",
-      "category": "company_profile",
-      "title": "Companies House company overview for GAIL'S LIMITED",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-profile-06055393.html",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-filing-history-06055393",
-      "category": "filing_history",
-      "title": "Companies House filing history for GAIL'S LIMITED",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-filing-history-06055393.html",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-parent-accounts-2025",
-      "category": "accounts",
-      "title": "Parent consolidated accounts, period ending 28 February 2025",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2025.pdf",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-parent-accounts-2024",
-      "category": "accounts",
-      "title": "Parent consolidated accounts, period ending 29 February 2024",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2024.pdf",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-parent-accounts-2023",
-      "category": "accounts",
-      "title": "Parent consolidated accounts, period ending 28 February 2023",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2023.pdf",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-charges-register-06055393",
-      "category": "charges",
-      "title": "Companies House charges register for GAIL'S LIMITED",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-charges-register-06055393.html",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-charge-0006",
-      "category": "charges",
-      "title": "Registration of charge 060553930006 created 6 June 2022",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-charge-0006.pdf",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-charge-0005",
-      "category": "charges",
-      "title": "Registration of charge 060553930005 created 4 November 2021",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-charge-0005.pdf",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-officers-06055393",
-      "category": "management",
-      "title": "Companies House officers for GAIL'S LIMITED",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-officers-06055393.html",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "ch-psc-06055393",
-      "category": "ownership",
-      "title": "Companies House persons with significant control for GAIL'S LIMITED",
-      "processing_status": "pending_download",
-      "local_path": "dataroom/raw/companies_house/ch-psc-06055393.html",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "news-expansion-2025-placeholder",
-      "category": "news",
-      "title": "Curated news placeholder: Gail's expansion and FY2025 sales coverage",
-      "processing_status": "pending_manual_curation",
-      "local_path": "dataroom/raw/news/news-expansion-2025-placeholder.md",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    },
-    {
-      "source_id": "news-community-context-2024-placeholder",
-      "category": "news",
-      "title": "Curated news placeholder: Gail's high-street expansion and community context",
-      "processing_status": "pending_manual_curation",
-      "local_path": "dataroom/raw/news/news-community-context-2024-placeholder.md",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
-    }
-  ],
+  "issues": [],
   "sources": [
     {
       "source_id": "ch-profile-06055393",
       "category": "company_profile",
       "title": "Companies House company overview for GAIL'S LIMITED",
-      "processing_status": "pending_download",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/companies_house/ch-profile-06055393.html",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/ch_profile_06055393.md",
+      "processed_exists": true,
+      "issue": null
     },
     {
       "source_id": "ch-filing-history-06055393",
       "category": "filing_history",
       "title": "Companies House filing history for GAIL'S LIMITED",
-      "processing_status": "pending_download",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/companies_house/ch-filing-history-06055393.html",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/ch_filing_history_06055393.md",
+      "processed_exists": true,
+      "issue": null
     },
     {
       "source_id": "ch-parent-accounts-2025",
       "category": "accounts",
       "title": "Parent consolidated accounts, period ending 28 February 2025",
-      "processing_status": "pending_download",
+      "processing_status": "downloaded",
+      "source_status": "pending",
       "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2025.pdf",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "local_exists": true,
+      "processed_path": null,
+      "processed_exists": false,
+      "issue": null
     },
     {
       "source_id": "ch-parent-accounts-2024",
       "category": "accounts",
       "title": "Parent consolidated accounts, period ending 29 February 2024",
-      "processing_status": "pending_download",
+      "processing_status": "downloaded",
+      "source_status": "pending",
       "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2024.pdf",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "local_exists": true,
+      "processed_path": null,
+      "processed_exists": false,
+      "issue": null
     },
     {
       "source_id": "ch-parent-accounts-2023",
       "category": "accounts",
       "title": "Parent consolidated accounts, period ending 28 February 2023",
-      "processing_status": "pending_download",
+      "processing_status": "downloaded",
+      "source_status": "pending",
       "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2023.pdf",
-      "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "local_exists": true,
+      "processed_path": null,
+      "processed_exists": false,
+      "issue": null
     },
     {
       "source_id": "ch-charges-register-06055393",
       "category": "charges",
       "title": "Companies House charges register for GAIL'S LIMITED",
-      "processing_status": "pending_download",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/companies_house/ch-charges-register-06055393.html",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/ch_charges_register.md",
+      "processed_exists": true,
+      "issue": null
     },
     {
       "source_id": "ch-charge-0006",
       "category": "charges",
       "title": "Registration of charge 060553930006 created 6 June 2022",
-      "processing_status": "pending_download",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/companies_house/ch-charge-0006.pdf",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/ch_charge_0006.md",
+      "processed_exists": true,
+      "issue": null
     },
     {
       "source_id": "ch-charge-0005",
       "category": "charges",
       "title": "Registration of charge 060553930005 created 4 November 2021",
-      "processing_status": "pending_download",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/companies_house/ch-charge-0005.pdf",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/ch_charge_0005.md",
+      "processed_exists": true,
+      "issue": null
     },
     {
       "source_id": "ch-officers-06055393",
       "category": "management",
       "title": "Companies House officers for GAIL'S LIMITED",
-      "processing_status": "pending_download",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/companies_house/ch-officers-06055393.html",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/ch_officers_06055393.md",
+      "processed_exists": true,
+      "issue": null
     },
     {
       "source_id": "ch-psc-06055393",
       "category": "ownership",
       "title": "Companies House persons with significant control for GAIL'S LIMITED",
-      "processing_status": "pending_download",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/companies_house/ch-psc-06055393.html",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/ch_psc_06055393.md",
+      "processed_exists": true,
+      "issue": null
     },
     {
       "source_id": "news-expansion-2025-placeholder",
       "category": "news",
       "title": "Curated news placeholder: Gail's expansion and FY2025 sales coverage",
-      "processing_status": "pending_manual_curation",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/news/news-expansion-2025-placeholder.md",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/guardian_expansion_2025.md",
+      "processed_exists": true,
+      "issue": null
     },
     {
       "source_id": "news-community-context-2024-placeholder",
       "category": "news",
       "title": "Curated news placeholder: Gail's high-street expansion and community context",
-      "processing_status": "pending_manual_curation",
+      "processing_status": "processed",
+      "source_status": "processed",
       "local_path": "dataroom/raw/news/news-community-context-2024-placeholder.md",
       "local_exists": false,
-      "issue": "expected raw source is not present yet"
+      "processed_path": "dataroom/processed/guardian_community_2024.md",
+      "processed_exists": true,
+      "issue": null
     }
   ]
 }

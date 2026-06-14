@@ -87,7 +87,8 @@
           "source_url",
           "local_path",
           "included_reason",
-          "processing_status"
+          "processing_status",
+          "source_status"
         ],
         "additionalProperties": false,
         "properties": {
@@ -135,6 +136,13 @@
               "verified"
             ]
           },
+          "source_status": {
+            "enum": [
+              "pending",
+              "processed",
+              "verified"
+            ]
+          },
           "expected_file": {
             "type": [
               "string",
@@ -169,6 +177,9 @@
             "minimum": 1
           },
           "notes": {
+            "type": "string"
+          },
+          "processed_path": {
             "type": "string"
           }
         }

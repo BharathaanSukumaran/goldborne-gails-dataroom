@@ -1,41 +1,386 @@
 import type { Config, Context } from "@netlify/functions";
-import { charges, citation, officers, ownership } from "./_shared/data";
+import OpenAI from "openai";
+import {
+  chargeFacts,
+  citation,
+  financialFacts,
+  officerFacts,
+  ownershipFacts,
+  retrieveSourceChunks,
+  sourceExists,
+  type Citation,
+  type SourceChunk
+} from "./_shared/data";
 
-const unknown = (missing: string[], answer = "I cannot answer that from the current dataroom evidence.") =>
-  Response.json({ answer, answer_type: "unknown", facts_used: [], citations: [], missing_information: missing, confidence: "low" });
+type AnswerType = "financial_metric" | "charges_security" | "ownership_management" | "credit_summary" | "source_lookup" | "unknown" | "other";
+type Confidence = "high" | "medium" | "low";
 
-function answerQuestion(question: string) {
-  const q = question.toLowerCase();
-  if (["covenant", "private", "banking headroom"].some((term) => q.includes(term))) {
-    return { answer: "I cannot answer that from the current dataroom evidence.", answer_type: "unknown", facts_used: [], citations: [], missing_information: ["structured covenant/private information not in dataroom"], confidence: "low" };
-  }
-  if (["revenue", "ebitda", "debt", "borrowings"].some((term) => q.includes(term))) {
-    return { answer: "For the latest seeded reporting period, revenue, EBITDA unknown status, and debt cannot be stated from reviewed structured facts yet. The source accounts PDFs must be ingested and reviewed first.", answer_type: "unknown", facts_used: [], citations: [], missing_information: ["revenue", "EBITDA", "debt"], confidence: "low" };
-  }
-  if (["risk", "summary", "credit"].some((term) => q.includes(term))) {
-    const citations = [citation("ch-charge-0006", charges[0].source_quote), citation("ch-charge-0005", charges[1].source_quote), citation("ch-psc-06055393", "Companies House PSC metadata."), citation("news-expansion-2025-placeholder", "Curated expansion news placeholder."), citation("news-community-context-2024-placeholder", "Curated community reaction news placeholder.")];
-    const answer = q.includes("summary") || q.includes("credit")
-      ? "Business overview: Gail's is represented as a UK bakery/cafe operator in the dataroom. Ownership: Bread Limited is recorded as active PSC with 75% or more control. Financial snapshot: revenue, EBITDA unknown status, and debt remain open until reviewed accounts are ingested. Security/charges: the dataroom records two outstanding Glas Trust Corporation Limited charges. Key risks: expansion execution, lease/capex exposure, local-community reaction, and information gaps on reviewed lender metrics. Open questions: reviewed accounts PDFs and any covenant package are required before final credit metrics can be stated."
-      : "Key lender risks visible in the current dataroom are security/lender exposure from two outstanding Glas Trust Corporation Limited charges, expansion execution and lease/capex exposure from the curated expansion source, local-community reaction from the curated community source, and information risk because revenue, EBITDA unknown status, debt and covenants need reviewed source documents before final lender metrics can be stated.";
-    return { answer, answer_type: "hybrid", facts_used: charges, citations, missing_information: [], confidence: "medium" };
-  }
-  if (["charge", "charges", "security", "lender"].some((term) => q.includes(term))) {
-    return { answer: charges.map((charge) => `Charge ${charge.charge_code} was created on ${charge.created_date}; status ${charge.status}; holder/person entitled: ${charge.holder}.`).join(" "), answer_type: "structured", facts_used: charges, citations: charges.map((charge) => citation(charge.source_id, charge.source_quote)), missing_information: [], confidence: "high" };
-  }
-  if (["director", "directors", "management", "officer"].some((term) => q.includes(term))) {
-    return { answer: "Current directors/officers in the dataroom: " + officers.map((officer) => `${officer.name} (${officer.role})`).join("; ") + ".", answer_type: "structured", facts_used: officers, citations: [citation("ch-officers-06055393", "Companies House officers metadata.")], missing_information: [], confidence: "high" };
-  }
-  if (["owner", "ownership", "psc", "ultimate"].some((term) => q.includes(term))) {
-    return { answer: `${ownership.owner_name} is an ${ownership.status} ${ownership.control_type} with ${ownership.percentage_band} control.`, answer_type: "structured", facts_used: [ownership], citations: [citation("ch-psc-06055393", "Companies House PSC metadata.")], missing_information: [], confidence: "high" };
-  }
-  return { answer: "I cannot answer that from the current dataroom evidence.", answer_type: "unknown", facts_used: [], citations: [], missing_information: ["No matching structured fact or retrieved evidence"], confidence: "low" };
-}
+type AskPayload = {
+  workspaceId?: string;
+  question?: unknown;
+};
+
+type AskResponse = {
+  answer: string;
+  answerType: AnswerType;
+  answer_type: AnswerType;
+  citations: Citation[];
+  factsUsed: unknown[];
+  facts_used: unknown[];
+  missingInformation: string[];
+  missing_information: string[];
+  confidence: Confidence;
+};
+
+type EvidencePacket = {
+  sourceChunks: SourceChunk[];
+  structuredFacts: unknown[];
+};
+
+const MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const OPENAI_SYNTHESIS_ENABLED = process.env.USE_OPENAI_SYNTHESIS === "true";
+const NOT_AVAILABLE = "This is not available in the current dataroom.";
+const FINANCIAL_TERMS = ["revenue", "turnover", "ebitda", "profit", "debt", "cash", "assets", "liabilities", "borrowings"];
+const CHARGES_TERMS = ["charge", "charges", "security", "lender", "persons entitled"];
+const OWNERSHIP_TERMS = ["owner", "ownership", "psc", "shareholder", "director", "directors", "management", "officer", "officers", "manage", "manages"];
+const SOURCE_TERMS = ["source", "sources", "document", "documents", "filing", "filings", "dataroom", "missing information"];
+const CREDIT_TERMS = ["credit", "committee", "risk", "risks", "summary", "summarise", "summarize", "business"];
+
+const SYSTEM_PROMPT = [
+  "You are a credit analyst assistant for Goldborne Capital.",
+  "Answer only using the supplied dataroom source excerpts and structured facts.",
+  "If the supplied evidence does not support the answer, say it is not available in the current dataroom and list missingInformation.",
+  "Do not invent figures, lenders, ownership, charges, dates, covenants, page references, or source ids.",
+  "Never estimate EBITDA. If it is not reported or cannot be computed from supplied facts, say it is unavailable.",
+  "Return strict JSON with keys: answer, answerType, citations, factsUsed, missingInformation, confidence.",
+  "Every citation must use a sourceId from the supplied source excerpts or structured facts."
+].join(" ");
+
+const responseSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    answer: { type: "string" },
+    answerType: {
+      type: "string",
+      enum: ["financial_metric", "charges_security", "ownership_management", "credit_summary", "source_lookup", "unknown", "other"]
+    },
+    citations: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          sourceId: { type: "string" },
+          title: { type: "string" },
+          page: { anyOf: [{ type: "number" }, { type: "null" }] },
+          snippet: { type: "string" }
+        },
+        required: ["sourceId", "title", "page", "snippet"]
+      }
+    },
+    factsUsed: { type: "array", items: {} },
+    missingInformation: { type: "array", items: { type: "string" } },
+    confidence: { type: "string", enum: ["high", "medium", "low"] }
+  },
+  required: ["answer", "answerType", "citations", "factsUsed", "missingInformation", "confidence"]
+} as const;
 
 export default async (req: Request, _context: Context) => {
   if (req.method !== "POST") return Response.json({ detail: "Method not allowed" }, { status: 405 });
-  const body = await req.json().catch(() => ({}));
-  if (!body.question || typeof body.question !== "string") return unknown(["question"]);
-  return Response.json(answerQuestion(body.question));
+
+  const body = (await req.json().catch(() => ({}))) as AskPayload;
+  if (!body.question || typeof body.question !== "string") {
+    return Response.json(unknown(["question"]));
+  }
+
+  const question = body.question.trim();
+  const route = classifyQuestion(question);
+  const evidence = buildEvidence(question, route);
+
+  if (!OPENAI_SYNTHESIS_ENABLED || !process.env.OPENAI_API_KEY) {
+    if (evidence.sourceChunks.length && ["credit_summary", "source_lookup", "other"].includes(route)) {
+      return Response.json(snippetOnlyAnswer(route, evidence));
+    }
+    const missing = [
+      ...(!OPENAI_SYNTHESIS_ENABLED ? ["USE_OPENAI_SYNTHESIS=true"] : []),
+      ...(!process.env.OPENAI_API_KEY ? ["OPENAI_API_KEY"] : [])
+    ];
+    return Response.json(unknown(missing, "OpenAI synthesis is not configured. Set USE_OPENAI_SYNTHESIS=true and OPENAI_API_KEY in the Netlify server environment to enable dataroom answers."));
+  }
+
+  if (!evidence.sourceChunks.length && !evidence.structuredFacts.length) {
+    return Response.json(unknown(["retrieved manifest-backed evidence"]));
+  }
+
+  try {
+    const answer = await synthesizeAnswer(question, route, evidence);
+    return Response.json(answer);
+  } catch (error) {
+    console.error("OpenAI Responses API request failed", error);
+    return Response.json(unknown(["OpenAI Responses API completion"], "The dataroom answer service could not complete OpenAI synthesis. Try again after checking the server OpenAI configuration."), { status: 502 });
+  }
 };
 
 export const config: Config = { path: "/api/ask" };
+
+function classifyQuestion(question: string): AnswerType {
+  const q = question.toLowerCase();
+  if (["covenant", "headroom", "private banking", "facility agreement"].some((term) => q.includes(term))) return "unknown";
+  if (FINANCIAL_TERMS.some((term) => q.includes(term))) return "financial_metric";
+  if (CREDIT_TERMS.some((term) => q.includes(term))) return "credit_summary";
+  if (CHARGES_TERMS.some((term) => q.includes(term))) return "charges_security";
+  if (OWNERSHIP_TERMS.some((term) => q.includes(term))) return "ownership_management";
+  if (SOURCE_TERMS.some((term) => q.includes(term))) return "source_lookup";
+  return "other";
+}
+
+function buildEvidence(question: string, route: AnswerType): EvidencePacket {
+  const retrieved = retrieveSourceChunks(question, 8).filter((chunk) => sourceExists(chunk.sourceId) && chunk.text.trim());
+  const structuredFacts = relevantStructuredFacts(question, route).filter((fact) => {
+    const sourceId = factSourceId(fact);
+    return Boolean(sourceId && sourceExists(sourceId));
+  });
+  const factSourceIds = new Set(structuredFacts.map((fact) => factSourceId(fact)).filter((sourceId): sourceId is string => Boolean(sourceId)));
+  const factChunks = Array.from(factSourceIds).flatMap((sourceId) => retrieveSourceChunks(sourceId, 2)).filter((chunk) => sourceExists(chunk.sourceId));
+  return {
+    sourceChunks: dedupeChunks([...retrieved, ...factChunks]).slice(0, 10),
+    structuredFacts
+  };
+}
+
+function relevantStructuredFacts(question: string, route: AnswerType): unknown[] {
+  const q = question.toLowerCase();
+  const facts: unknown[] = [];
+
+  if (route === "financial_metric" || FINANCIAL_TERMS.some((term) => q.includes(term))) facts.push(...financialFacts.filter(isAnswerUsableFinancialFact));
+  if (route === "charges_security" || CHARGES_TERMS.some((term) => q.includes(term))) facts.push(...chargeFacts);
+  if (route === "ownership_management" || OWNERSHIP_TERMS.some((term) => q.includes(term))) facts.push(...ownershipFacts, ...officerFacts);
+
+  return facts;
+}
+
+async function synthesizeAnswer(question: string, route: AnswerType, evidence: EvidencePacket): Promise<AskResponse> {
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const response = await client.responses.create({
+    model: MODEL,
+    input: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: buildPrompt(question, route, evidence) }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "dataroom_answer",
+        schema: responseSchema,
+        strict: true
+      }
+    }
+  });
+
+  const parsed = parseModelJson(response.output_text ?? "");
+  if (!parsed) return unknown(["model_json_response"]);
+
+  const normalized = makeResponse({
+    answer: String(parsed.answer || NOT_AVAILABLE),
+    answerType: normalizeAnswerType(parsed.answerType, route),
+    factsUsed: evidenceFactsUsed(evidence),
+    citations: normalizeModelCitations(parsed.citations, evidence),
+    missingInformation: Array.isArray(parsed.missingInformation) ? parsed.missingInformation.map(String) : [],
+    confidence: normalizeConfidence(parsed.confidence)
+  });
+
+  return verifyResponse(normalized, evidence) ? normalized : unknown(["answer verification failed"]);
+}
+
+function buildPrompt(question: string, route: AnswerType, evidence: EvidencePacket): string {
+  const financialMetricsAreUnreviewed = evidence.structuredFacts.some((fact) => {
+    if (!isRecord(fact) || typeof fact.metric !== "string") return false;
+    return !isAnswerUsableFinancialFact(fact);
+  });
+
+  return JSON.stringify({
+    workspaceId: "gails-limited",
+    route,
+    question,
+    sourceExcerpts: evidence.sourceChunks.map(chunkPayload),
+    structuredFacts: evidence.structuredFacts,
+    financialWarning: financialMetricsAreUnreviewed
+      ? "Financial metric facts are not reviewed and approved for answer use. Do not state numeric revenue, EBITDA, debt, cash, assets, liabilities, or profit. Mark unavailable metrics in missingInformation."
+      : undefined,
+    responseRules: [
+      "Use only sourceExcerpts and structuredFacts supplied in this prompt.",
+      `If evidence is insufficient, answer exactly: ${NOT_AVAILABLE}`,
+      "Citations must use sourceId values present in sourceExcerpts or structuredFacts.",
+      "Keep factsUsed to the exact supplied facts or chunks that support the answer."
+    ]
+  });
+}
+
+
+function snippetOnlyAnswer(route: AnswerType, evidence: EvidencePacket): AskResponse {
+  const chunks = evidence.sourceChunks.filter((chunk) => sourceExists(chunk.sourceId) && chunk.text.trim());
+  if (!chunks.length) return unknown(["retrieved manifest-backed evidence"]);
+  return makeResponse({
+    answer: "Retrieved dataroom snippets state: " + chunks
+      .slice(0, 3)
+      .map((chunk) => `${chunk.title}: ${chunk.text.slice(0, 700).trim()}`)
+      .join(" ")
+      .slice(0, 1200),
+    answerType: route,
+    factsUsed: chunks.map(chunkPayload),
+    citations: dedupeCitations(chunks.slice(0, 3).map((chunk) => citation(chunk.sourceId, chunk.text.slice(0, 260), chunk.page))),
+    missingInformation: [],
+    confidence: "medium"
+  });
+}
+
+function evidenceFactsUsed(evidence: EvidencePacket): unknown[] {
+  return [
+    ...evidence.structuredFacts,
+    ...evidence.sourceChunks.map(chunkPayload)
+  ];
+}
+
+function verifyResponse(response: AskResponse, evidence: EvidencePacket): boolean {
+  const validSourceIds = new Set([
+    ...evidence.sourceChunks.map((chunk) => chunk.sourceId),
+    ...evidence.structuredFacts.map((fact) => factSourceId(fact)).filter((sourceId): sourceId is string => Boolean(sourceId))
+  ]);
+  if (response.citations.some((item) => !validSourceIds.has(item.source_id) || !sourceExists(item.source_id))) return false;
+
+  const mentionsFinancialMetric = /\b(revenue|turnover|ebitda|debt|borrowings|profit|cash|assets|liabilities)\b/i.test(response.answer);
+  const hasCurrencyOrLargeNumber = /(£|gbp|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d+(?:\.\d+)?m\b)/i.test(response.answer);
+  const hasSupportedFinancialValue = evidence.structuredFacts.some((fact) => isAnswerUsableFinancialFact(fact) && fact.value !== null);
+  if (mentionsFinancialMetric && hasCurrencyOrLargeNumber && !hasSupportedFinancialValue) return false;
+
+  if (/ebitda/i.test(response.answer) && hasCurrencyOrLargeNumber && !hasSupportedFinancialValue) return false;
+  return true;
+}
+
+function normalizeModelCitations(value: unknown, evidence: EvidencePacket): Citation[] {
+  const fallback = () => fallbackCitations(evidence);
+  if (!Array.isArray(value)) return fallback();
+
+  const validSourceIds = new Set([
+    ...evidence.sourceChunks.map((chunk) => chunk.sourceId),
+    ...evidence.structuredFacts.map((fact) => factSourceId(fact)).filter((sourceId): sourceId is string => Boolean(sourceId))
+  ]);
+
+  const citations = value.flatMap((item): Citation[] => {
+    if (!isRecord(item)) return [];
+    const sourceId = String(item.sourceId || item.source_id || "");
+    if (!sourceId || !validSourceIds.has(sourceId) || !sourceExists(sourceId)) return [];
+    const snippet = typeof item.snippet === "string" ? item.snippet : undefined;
+    const page = typeof item.page === "number" ? item.page : null;
+    return [citation(sourceId, snippet, page)];
+  });
+
+  return citations.length ? dedupeCitations(citations) : fallback();
+}
+
+function fallbackCitations(evidence: EvidencePacket): Citation[] {
+  const chunkCitations = evidence.sourceChunks.slice(0, 3).map((chunk) => citation(chunk.sourceId, chunk.text.slice(0, 260), chunk.page));
+  const factCitations = evidence.structuredFacts.flatMap((fact) => {
+    const sourceId = factSourceId(fact);
+    if (!sourceId || !sourceExists(sourceId)) return [];
+    const snippet = isRecord(fact) && typeof fact.sourceQuote === "string" ? fact.sourceQuote : isRecord(fact) && typeof fact.quote === "string" ? fact.quote : undefined;
+    const page = isRecord(fact) && typeof fact.page === "number" ? fact.page : null;
+    return [citation(sourceId, snippet, page)];
+  });
+  return dedupeCitations([...chunkCitations, ...factCitations]).slice(0, 5);
+}
+
+function normalizeFactsUsed(value: unknown, fallbackFacts: unknown[]): unknown[] {
+  if (!Array.isArray(value)) return fallbackFacts;
+  return value.length ? value : fallbackFacts;
+}
+
+function parseModelJson(text: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function normalizeAnswerType(value: unknown, fallback: AnswerType): AnswerType {
+  const allowed: AnswerType[] = ["financial_metric", "charges_security", "ownership_management", "credit_summary", "source_lookup", "unknown", "other"];
+  return allowed.includes(value as AnswerType) ? value as AnswerType : fallback;
+}
+
+function normalizeConfidence(value: unknown): Confidence {
+  return value === "high" || value === "medium" || value === "low" ? value : "medium";
+}
+
+function chunkPayload(chunk: SourceChunk) {
+  return {
+    chunkId: chunk.chunkId,
+    sourceId: chunk.sourceId,
+    title: chunk.title,
+    category: chunk.category,
+    page: chunk.page,
+    snippet: chunk.text.slice(0, 700)
+  };
+}
+
+function dedupeChunks(chunks: SourceChunk[]): SourceChunk[] {
+  const seen = new Set<string>();
+  const out: SourceChunk[] = [];
+  for (const chunk of chunks) {
+    if (seen.has(chunk.chunkId)) continue;
+    seen.add(chunk.chunkId);
+    out.push(chunk);
+  }
+  return out;
+}
+
+function dedupeCitations(citations: Citation[]): Citation[] {
+  const seen = new Set<string>();
+  const out: Citation[] = [];
+  for (const item of citations) {
+    const key = `${item.source_id}:${item.page ?? ""}:${item.snippet ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+function isAnswerUsableFinancialFact(fact: unknown): fact is Record<string, unknown> {
+  return isRecord(fact) && typeof fact.metric === "string" && fact.reviewed === true && fact.usedInAnswers === true;
+}
+
+function factSourceId(fact: unknown): string | null {
+  return isRecord(fact) && typeof fact.sourceId === "string" ? fact.sourceId : null;
+}
+
+function unknown(missingInformation: string[], answer = NOT_AVAILABLE): AskResponse {
+  return makeResponse({
+    answer,
+    answerType: "unknown",
+    factsUsed: [],
+    citations: [],
+    missingInformation,
+    confidence: "low"
+  });
+}
+
+function makeResponse(input: Omit<AskResponse, "answer_type" | "facts_used" | "missing_information">): AskResponse {
+  return {
+    ...input,
+    answer_type: input.answerType,
+    facts_used: input.factsUsed,
+    missing_information: input.missingInformation
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}

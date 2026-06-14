@@ -20,10 +20,10 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function askDataroom(payload: AskRequest): Promise<AskResponse> {
+export function askDataroom(payload: Pick<AskRequest, "question">): Promise<AskResponse> {
   return requestJson<AskResponse>("/ask", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ workspaceId: "gails-limited", ...payload })
   });
 }
 

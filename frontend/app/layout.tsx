@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Goldborne Gail's Dataroom",
-  description: "AI dataroom assistant for Gail's Limited public company information."
+  title: "Goldborne Capital Intelligence Platform",
+  description: "Capital intelligence workspace for company diligence, dataroom evidence, and AI analysis."
 };
 
 export default function RootLayout({

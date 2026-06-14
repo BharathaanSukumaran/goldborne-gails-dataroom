@@ -82,6 +82,20 @@ class SearchBackend(Protocol):
         ...
 
 
+def filter_manifest_backed_chunks(
+    chunks: Iterable[DocumentChunk],
+    manifest_sources: Iterable[Mapping[str, Any] | Any],
+) -> list[DocumentChunk]:
+    """Keep only chunks whose source_id resolves to a source manifest entry."""
+
+    manifest_ids = {
+        str(_field(source, "source_id") or _field(source, "id"))
+        for source in manifest_sources
+        if _field(source, "source_id") or _field(source, "id")
+    }
+    return [chunk for chunk in chunks if chunk.source_id in manifest_ids]
+
+
 def chunk_document_pages(
     pages: Iterable[DocumentPage],
     *,
@@ -300,3 +314,9 @@ def _normalize_text(text: str) -> str:
 
 def _tokens(text: str) -> list[str]:
     return [match.group(0).lower() for match in TOKEN_RE.finditer(text)]
+
+
+def _field(item: Mapping[str, Any] | Any, name: str) -> Any:
+    if isinstance(item, Mapping):
+        return item.get(name)
+    return getattr(item, name, None)

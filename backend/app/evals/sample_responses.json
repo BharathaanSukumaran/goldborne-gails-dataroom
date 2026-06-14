@@ -1,0 +1,85 @@
+{
+  "brief_revenue_ebitda_exact_or_unknown": {
+    "answer": "I cannot answer the latest revenue and EBITDA from the dataroom because reviewed financial facts for those metrics have not been extracted yet.",
+    "answer_type": "unknown",
+    "facts_used": [],
+    "citations": [],
+    "missing_information": ["revenue", "ebitda"],
+    "confidence": "low"
+  },
+  "brief_charges_have_holder_status_and_sources": {
+    "answer": "The Companies House charges register records two outstanding charges, including charges 060553930006 and 060553930005, with Glas Trust Corporation Limited listed as the person entitled.",
+    "answer_type": "charges",
+    "facts_used": [
+      {
+        "charge_id": "060553930006",
+        "status": "outstanding",
+        "persons_entitled": "Glas Trust Corporation Limited",
+        "source_document_id": "ch-charges-register-06055393"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charges-register-06055393",
+        "title": "Companies House charges register for GAIL'S LIMITED",
+        "snippet": "Charges page shows 6 charges registered: 2 outstanding, 4 satisfied; outstanding 0006 and 0005 name Glas Trust Corporation Limited."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "high"
+  },
+  "brief_lender_risks_are_sourced_or_unknown": {
+    "answer": "A lender risk summary should consider outstanding registered security, reliance on continued expansion, and community reaction to high-street rollout.",
+    "answer_type": "narrative",
+    "facts_used": [],
+    "citations": [
+      {
+        "source_id": "ch-charges-register-06055393",
+        "title": "Companies House charges register for GAIL'S LIMITED",
+        "snippet": "Charges page shows 6 charges registered: 2 outstanding, 4 satisfied."
+      },
+      {
+        "source_id": "news-community-context-2024-placeholder",
+        "title": "Curated news placeholder: Gail's high-street expansion and community context",
+        "snippet": "Placeholder for curated narrative coverage of high-street expansion, brand perception, and community reaction risk."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "medium"
+  },
+  "brief_credit_summary_is_sourced_or_unknown": {
+    "answer": "GAIL'S LIMITED is a UK bakery operator with Companies House filings, registered charges, active directors, PSC information, and curated news placeholders available in the dataroom.",
+    "answer_type": "narrative",
+    "facts_used": [],
+    "citations": [
+      {
+        "source_id": "ch-profile-06055393",
+        "title": "Companies House company overview for GAIL'S LIMITED",
+        "snippet": "Baseline legal identity, registered office, status, incorporation date, accounts status, confirmation statement status, and SIC code."
+      },
+      {
+        "source_id": "ch-psc-06055393",
+        "title": "Companies House persons with significant control for GAIL'S LIMITED",
+        "snippet": "Active PSC observed: Bread Limited, ownership of shares of 75% or more."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "medium"
+  },
+  "debt_exact_or_unknown": {
+    "answer": "I cannot answer the latest debt balance from the dataroom because a reviewed debt fact has not been extracted yet.",
+    "answer_type": "unknown",
+    "facts_used": [],
+    "citations": [],
+    "missing_information": ["debt"],
+    "confidence": "low"
+  },
+  "private_covenants_unknown": {
+    "answer": "I cannot answer this from the dataroom because private banking covenant and headroom information is not available in the provided sources.",
+    "answer_type": "unknown",
+    "facts_used": [],
+    "citations": [],
+    "missing_information": ["private banking covenants", "headroom"],
+    "confidence": "low"
+  }
+}

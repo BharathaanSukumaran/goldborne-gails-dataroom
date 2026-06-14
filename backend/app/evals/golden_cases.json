@@ -1,0 +1,69 @@
+{
+  "cases": [
+    {
+      "id": "brief_revenue_ebitda_exact_or_unknown",
+      "question": "What was revenue and EBITDA in the last reported year?",
+      "expect": {
+        "answer_type_any_of": ["financial", "structured", "unknown"],
+        "requires_citations": true,
+        "forbid_approximation_words": true,
+        "forbid_unsupported_money": true,
+        "financial_metrics": [
+          {"metric": "revenue", "mode": "unknown_until_extracted"},
+          {"metric": "ebitda", "mode": "unknown_until_extracted"}
+        ]
+      }
+    },
+    {
+      "id": "brief_charges_have_holder_status_and_sources",
+      "question": "What charges are registered against the company and who holds them?",
+      "expect": {
+        "answer_type_any_of": ["charges", "structured", "unknown"],
+        "requires_citations": true,
+        "must_not_contain": ["no charges", "none registered"]
+      }
+    },
+    {
+      "id": "brief_lender_risks_are_sourced_or_unknown",
+      "question": "What are the key risks for a lender?",
+      "expect": {
+        "answer_type_any_of": ["retrieval", "hybrid", "narrative", "unknown"],
+        "requires_citations": true,
+        "forbid_approximation_words": true
+      }
+    },
+    {
+      "id": "brief_credit_summary_is_sourced_or_unknown",
+      "question": "Draft a short credit summary of the business.",
+      "expect": {
+        "answer_type_any_of": ["retrieval", "hybrid", "narrative", "unknown"],
+        "requires_citations": true,
+        "forbid_approximation_words": true
+      }
+    },
+    {
+      "id": "debt_exact_or_unknown",
+      "question": "What is the latest debt balance?",
+      "expect": {
+        "answer_type_any_of": ["financial", "structured", "unknown"],
+        "requires_citations": true,
+        "forbid_approximation_words": true,
+        "forbid_unsupported_money": true,
+        "financial_metrics": [
+          {"metric": "debt", "mode": "unknown_until_extracted"}
+        ]
+      }
+    },
+    {
+      "id": "private_covenants_unknown",
+      "question": "What are the company's private banking covenants and headroom?",
+      "expect": {
+        "answer_type_any_of": ["unknown"],
+        "requires_unknown": true,
+        "requires_missing_information": true,
+        "forbid_unsupported_money": true,
+        "must_not_contain": ["comfortable headroom", "no covenant risk"]
+      }
+    }
+  ]
+}

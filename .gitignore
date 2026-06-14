@@ -10,3 +10,14 @@ data/processed/
 data/raw/
 data/index/
 reports/
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+backend/.venv/
+backend/dataroom.sqlite
+*.db
+src/*.egg-info/
+app/__pycache__/
+tests/__pycache__/
+backend/**/__pycache__/
+scripts/__pycache__/

@@ -16,27 +16,47 @@ const rawLabels = [
   "charges_register",
   "ownership_management",
   "news_events",
+  "industry_context",
   "source_count",
   "indexed_count",
+  "indexed_source_count",
   "usedInAnswers",
+  "used_in_answers",
   "reviewed=",
-  "workspaceId",
+  "reviewed: true",
+  "reviewed: false",
   "sourceId",
+  "source_id",
+  "workspaceId",
+  "workspace_id",
   "periodEnd",
-  "reportedOrComputed"
+  "period_end",
+  "reportedOrComputed",
+  "reported_or_computed",
+  "processing_status",
+  "source_status",
+  "included_reason",
+  "local_path",
+  "financial_facts"
 ];
-
-const allowedInternalTokens = new Map([
-  ["frontend/components/source-card.tsx", new Set(["sourceId"])]
-]);
 
 const failures = [];
 
 for (const file of files) {
   const text = readFileSync(join(ROOT, file), "utf8");
+
+  if (/Object\.entries\([^)]*\)\.map/.test(text)) {
+    failures.push(`${file}: generic Object.entries rendering`);
+  }
+
   for (const rawLabel of rawLabels) {
-    if (text.includes(rawLabel) && !allowedInternalTokens.get(file)?.has(rawLabel)) {
-      failures.push(`${file}: raw label "${rawLabel}"`);
+    const escaped = escapeRegExp(rawLabel);
+    const visibleText = new RegExp(`>[^<>{}\\n]*${escaped}[^<>{}\\n]*<`);
+    const visibleAttribute = new RegExp(`(?:aria-label|title|placeholder)=["'][^"']*${escaped}[^"']*["']`);
+    const stringChild = new RegExp(`\\{["']${escaped}["']\\}`);
+
+    if (visibleText.test(text) || visibleAttribute.test(text) || stringChild.test(text)) {
+      failures.push(`${file}: visible raw label "${rawLabel}"`);
     }
   }
 }
@@ -50,3 +70,7 @@ if (failures.length) {
 }
 
 console.log("Frontend display-label check passed.");
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

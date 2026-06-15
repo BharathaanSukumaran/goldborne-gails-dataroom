@@ -2,8 +2,8 @@ type LabelDictionary = Record<string, string>;
 
 const FIELD_LABELS: LabelDictionary = {
   source_count: "Documents",
-  indexed_count: "Search-ready documents",
-  indexed_source_count: "Search-ready documents",
+  indexed_count: "Ready documents",
+  indexed_source_count: "Ready documents",
   usedInAnswers: "Available for answers",
   used_in_answers: "Available for answers",
   reviewed: "Source checked",
@@ -15,6 +15,10 @@ const FIELD_LABELS: LabelDictionary = {
   period_end: "Period end",
   reportedOrComputed: "Basis",
   reported_or_computed: "Basis",
+  processing_status: "Status",
+  source_status: "Status",
+  included_reason: "Why included",
+  local_path: "Local file",
   financial_facts: "Financial figures"
 };
 

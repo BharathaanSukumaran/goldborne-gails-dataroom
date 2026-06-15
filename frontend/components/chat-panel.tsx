@@ -28,7 +28,7 @@ const initialMessage: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Ask anything about the GAIL'S Limited dataroom. I will answer from reviewed documents and show the sources I used. Financial figures are only used after source review."
+    "Ask questions about the GAIL'S Limited dataroom. I will answer from reviewed documents and show the sources I used."
 };
 
 type ChatPanelProps = {
@@ -47,6 +47,7 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const canSubmit = useMemo(() => question.trim().length > 0 && !loading, [loading, question]);
+  const showSuggestions = messages.length === 1 && !editingMessageId;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -104,9 +105,6 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
         missingInformation,
         confidence: response.confidence
       });
-      if (citations.length || missingInformation.length || reviewedFacts.length) {
-        onOpenInspector?.();
-      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -155,6 +153,7 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
               message={message}
               loading={loading}
               onEdit={startEditing}
+              onOpenInspector={onOpenInspector}
             />
           ))}
 
@@ -180,19 +179,23 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
 
       <div className="sticky bottom-0 z-10 border-t border-line bg-white/95 px-4 py-4 shadow-[0_-16px_36px_rgba(21,23,18,0.08)] backdrop-blur sm:px-7">
         <div className="mx-auto max-w-4xl">
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-            {suggestedQuestions.map((item) => (
-              <button
-                key={item}
-                className="shrink-0 rounded-md border border-line bg-white px-3 py-2 text-left text-sm text-ink/72 transition hover:border-moss hover:text-ink"
-                disabled={loading}
-                onClick={() => void submitQuestion(item)}
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
-          </div>
+          {showSuggestions ? (
+            <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+              {suggestedQuestions.map((item) => (
+                <button
+                  key={item}
+                  className="shrink-0 rounded-md border border-line bg-white px-3 py-2 text-left text-sm text-ink/72 transition hover:border-moss hover:text-ink"
+                  disabled={loading}
+                  onClick={() => {
+                    void submitQuestion(item);
+                  }}
+                  type="button"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {editingMessageId ? (
             <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               <span>Editing your previous question. Sending will replace the following thread.</span>
@@ -239,11 +242,13 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
 function ChatMessage({
   message,
   loading,
-  onEdit
+  onEdit,
+  onOpenInspector
 }: {
   message: Message;
   loading: boolean;
   onEdit: (message: Message) => void;
+  onOpenInspector?: () => void;
 }) {
   const isAssistant = message.role === "assistant";
 
@@ -262,7 +267,6 @@ function ChatMessage({
               : "border-sky bg-sky text-white"
           }`}
         >
-          {isAssistant ? <p className="mb-2 text-xs font-semibold uppercase text-moss">Direct answer</p> : null}
           <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
         {!isAssistant ? (
@@ -290,7 +294,18 @@ function ChatMessage({
         ) : null}
         {message.citations?.length ? (
           <div className="mt-3">
-            <p className="mb-2 text-xs font-semibold uppercase text-ink/48">Sources used</p>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase text-ink/48">Sources used</p>
+              {onOpenInspector ? (
+                <button
+                  className="rounded-md px-2 py-1 text-xs font-medium text-sky hover:bg-paper hover:text-ink"
+                  type="button"
+                  onClick={onOpenInspector}
+                >
+                  View in dataroom
+                </button>
+              ) : null}
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
               {message.citations.map((citation, index) => (
                 <SourceCard key={`${citation.title ?? "citation"}-${index}`} source={citation} compact />

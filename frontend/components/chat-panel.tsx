@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertCircle, Bot, Loader2, Send, UserRound } from "lucide-react";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { AlertCircle, Bot, Loader2, Pencil, Send, UserRound } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { askDataroom } from "@/lib/api";
 import { confidenceLabel, missingInformationLabel } from "@/lib/display-labels";
 import type { AskResponse, Citation, InspectionState, ReviewedFact } from "@/lib/types";
@@ -39,26 +39,47 @@ type ChatPanelProps = {
 export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [question, setQuestion] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
 
   const canSubmit = useMemo(() => question.trim().length > 0 && !loading, [loading, question]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, loading, error]);
+
+  useEffect(() => {
+    resizeComposer();
+  }, [question]);
 
   async function submitQuestion(nextQuestion = question) {
     const trimmedQuestion = nextQuestion.trim();
     if (!trimmedQuestion || loading) return;
 
+    const editedId = editingMessageId;
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: editedId ?? crypto.randomUUID(),
       role: "user",
       content: trimmedQuestion
     };
 
-    setMessages((current) => [...current, userMessage]);
     setQuestion("");
+    setEditingMessageId(null);
     setError(null);
     setLoading(true);
+
+    setMessages((current) => {
+      if (!editedId) return [...current, userMessage];
+
+      const editIndex = current.findIndex((message) => message.id === editedId);
+      if (editIndex === -1) return [...current, userMessage];
+
+      return [...current.slice(0, editIndex), userMessage];
+    });
 
     try {
       const response: AskResponse = await askDataroom({ question: trimmedQuestion });
@@ -103,12 +124,38 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
     void submitQuestion();
   }
 
+  function startEditing(message: Message) {
+    if (loading) return;
+    setEditingMessageId(message.id);
+    setQuestion(message.content);
+    setError(null);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  function cancelEditing() {
+    setEditingMessageId(null);
+    setQuestion("");
+    textareaRef.current?.focus();
+  }
+
+  function resizeComposer() {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 176)}px`;
+  }
+
   return (
-    <section className="flex h-full min-h-0 flex-1 flex-col bg-white">
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-7">
+    <section className="relative flex h-full min-h-0 flex-1 flex-col bg-white">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 pb-8 sm:px-7">
         <div className="mx-auto flex max-w-4xl flex-col gap-5">
           {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
+            <ChatMessage
+              key={message.id}
+              message={message}
+              loading={loading}
+              onEdit={startEditing}
+            />
           ))}
 
           {loading ? (
@@ -127,10 +174,11 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
               </div>
             </div>
           ) : null}
+          <div ref={endRef} />
         </div>
       </div>
 
-      <div className="border-t border-line bg-paper/80 px-4 py-4 sm:px-7">
+      <div className="sticky bottom-0 z-10 border-t border-line bg-white/95 px-4 py-4 shadow-[0_-16px_36px_rgba(21,23,18,0.08)] backdrop-blur sm:px-7">
         <div className="mx-auto max-w-4xl">
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
             {suggestedQuestions.map((item) => (
@@ -145,30 +193,42 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
               </button>
             ))}
           </div>
-          <form className="flex items-end gap-3" onSubmit={onSubmit}>
-            <textarea
-              ref={textareaRef}
-              className="max-h-44 min-h-16 flex-1 resize-y rounded-lg border border-line bg-white px-4 py-3 text-base leading-6 text-ink outline-none placeholder:text-ink/38"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void submitQuestion();
-                }
-              }}
-              placeholder="Ask anything about this dataroom..."
-              aria-label="Ask anything about this dataroom"
-            />
-            <button
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-moss text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:bg-ink/28"
-              disabled={!canSubmit}
-              type="submit"
-              aria-label="Send question"
-              title="Send question"
-            >
-              {loading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
-            </button>
+          {editingMessageId ? (
+            <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <span>Editing your previous question. Sending will replace the following thread.</span>
+              <button className="font-medium hover:text-ink" type="button" onClick={cancelEditing}>
+                Cancel
+              </button>
+            </div>
+          ) : null}
+          <form className="rounded-xl border border-line bg-white p-2 shadow-sm focus-within:border-moss" onSubmit={onSubmit}>
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={textareaRef}
+                className="max-h-44 min-h-12 flex-1 resize-none bg-transparent px-3 py-3 text-base leading-6 text-ink outline-none placeholder:text-ink/38"
+                value={question}
+                rows={1}
+                onChange={(event) => setQuestion(event.target.value)}
+                onInput={resizeComposer}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void submitQuestion();
+                  }
+                }}
+                placeholder="Ask anything about this dataroom..."
+                aria-label="Ask anything about this dataroom"
+              />
+              <button
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-moss text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:bg-ink/28"
+                disabled={!canSubmit}
+                type="submit"
+                aria-label={editingMessageId ? "Update question" : "Send question"}
+                title={editingMessageId ? "Update question" : "Send question"}
+              >
+                {loading ? <Loader2 size={19} className="animate-spin" /> : <Send size={19} />}
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -176,11 +236,19 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
   );
 }
 
-function ChatMessage({ message }: { message: Message }) {
+function ChatMessage({
+  message,
+  loading,
+  onEdit
+}: {
+  message: Message;
+  loading: boolean;
+  onEdit: (message: Message) => void;
+}) {
   const isAssistant = message.role === "assistant";
 
   return (
-    <article className={`flex gap-3 ${isAssistant ? "" : "justify-end"}`}>
+    <article className={`group flex gap-3 ${isAssistant ? "" : "justify-end"}`}>
       {isAssistant ? (
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-moss/10 text-moss">
           <Bot size={18} aria-hidden="true" />
@@ -197,6 +265,19 @@ function ChatMessage({ message }: { message: Message }) {
           {isAssistant ? <p className="mb-2 text-xs font-semibold uppercase text-moss">Direct answer</p> : null}
           <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
+        {!isAssistant ? (
+          <div className="mt-2 flex justify-end">
+            <button
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink/48 opacity-100 transition hover:bg-paper hover:text-ink sm:opacity-0 sm:group-hover:opacity-100"
+              type="button"
+              disabled={loading}
+              onClick={() => onEdit(message)}
+            >
+              <Pencil size={13} aria-hidden="true" />
+              Edit
+            </button>
+          </div>
+        ) : null}
         {message.missingInformation?.length ? (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-medium">Missing information</p>

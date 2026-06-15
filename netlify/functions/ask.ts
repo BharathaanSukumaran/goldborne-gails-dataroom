@@ -291,6 +291,11 @@ function structuredChargesAnswer(question: string): AskResponse {
   if (fieldIntent === "charge_created_date") {
     return chargeFieldResponse(charge, fieldIntent, `Charge ${charge.chargeCode} was created on ${charge.createdDate}.`, "high");
   }
+  const key = chargeFactKey(fieldIntent);
+  if (key && isReviewedChargeField(charge, key)) {
+    const label = CHARGE_FIELD_LABELS[fieldIntent] || "requested charge field";
+    return chargeFieldResponse(charge, fieldIntent, `The reviewed ${label} for charge ${charge.chargeCode} is: ${String(charge[key] || "").replace(/\.$/, "")}.`, "high");
+  }
   return unavailableChargeFieldResponse(charge, fieldIntent);
 }
 

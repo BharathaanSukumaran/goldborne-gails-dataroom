@@ -3,22 +3,37 @@ export type Citation = {
   sourceId?: string;
   title?: string;
   category?: string;
+  issuer?: string;
   source_url?: string;
   page?: number | string | null;
   snippet?: string;
   url?: string;
+  included_reason?: string;
+  includedReason?: string;
+  processing_status?: string;
+  source_status?: string;
+  status?: string;
 };
 
 export type AskResponse = {
   answer: string;
   answerType?: string;
   answer_type?: string;
-  factsUsed?: unknown[];
-  facts_used?: unknown[];
+  factsUsed?: ReviewedFact[];
+  facts_used?: ReviewedFact[];
   citations?: Citation[];
   missingInformation?: string[];
   missing_information?: string[];
   confidence?: "low" | "medium" | "high" | string;
+};
+
+export type ReviewedFact = Record<string, unknown>;
+
+export type InspectionState = {
+  citations: Citation[];
+  reviewedFacts: ReviewedFact[];
+  missingInformation: string[];
+  confidence?: string;
 };
 
 export type Source = {

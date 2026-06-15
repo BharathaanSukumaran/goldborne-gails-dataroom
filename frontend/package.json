@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check:labels": "node ../scripts/check_frontend_display_labels.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

@@ -7,13 +7,13 @@ export default function NotFound() {
         <p className="text-sm font-semibold uppercase tracking-[0.14em] text-moss">404</p>
         <h1 className="mt-2 text-2xl font-semibold text-ink">Page not found</h1>
         <p className="mt-3 text-sm leading-6 text-ink/64">
-          The Goldborne Capital Intelligence Platform is available from the main dashboard.
+          The Goldborne Capital Intelligence Platform is available from the dataroom chat.
         </p>
         <Link
           className="mt-5 inline-flex rounded-md bg-moss px-4 py-2 text-sm font-medium text-white hover:bg-ink"
           href="/"
         >
-          Return to dashboard
+          Return to dataroom
         </Link>
       </div>
     </main>

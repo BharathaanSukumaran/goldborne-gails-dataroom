@@ -320,6 +320,31 @@
           "forbid_generic_charge_list": true
         }
       }
+    },
+    {
+      "id": "bare_brief_description_reviewed_summary",
+      "question": "Brief description",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "must_contain": [
+          "No specific land, ship, aircraft or intellectual property",
+          "0605 5393 0006",
+          "0605 5393 0005"
+        ],
+        "charge_field": {
+          "field_intent": "charge_description",
+          "expected_source_id": "ch-charge-0006",
+          "must_contain": [
+            "No specific land, ship, aircraft or intellectual property"
+          ],
+          "forbid_generic_charge_list": true
+        }
+      }
     }
   ]
 }

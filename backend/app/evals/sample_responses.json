@@ -269,5 +269,36 @@
     ],
     "missing_information": [],
     "confidence": "high"
+  },
+  "bare_brief_description_reviewed_summary": {
+    "answer": "Reviewed charge description for the matching charges: Charge 0605 5393 0006: No specific land, ship, aircraft or intellectual property has been charged. Charge 0605 5393 0005: No specific land, ship, aircraft or intellectual property has been charged.",
+    "answer_type": "charges_security",
+    "field_intent": "charge_description",
+    "facts_used": [
+      {
+        "chargeCode": "060553930006",
+        "fieldIntent": "charge_description",
+        "sourceId": "ch-charge-0006"
+      },
+      {
+        "chargeCode": "060553930005",
+        "fieldIntent": "charge_description",
+        "sourceId": "ch-charge-0005"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charge-0006",
+        "title": "Companies House charge 0006 for GAIL'S LIMITED",
+        "snippet": "No specific land, ship, aircraft or intellectual property has been charged."
+      },
+      {
+        "source_id": "ch-charge-0005",
+        "title": "Companies House charge 0005 for GAIL'S LIMITED",
+        "snippet": "No specific land, ship, aircraft or intellectual property has been charged."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "high"
   }
 }

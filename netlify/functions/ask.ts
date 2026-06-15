@@ -47,8 +47,8 @@ const OPENAI_SYNTHESIS_ENABLED = process.env.USE_OPENAI_SYNTHESIS === "true";
 const NOT_AVAILABLE = "This is not available in the current dataroom.";
 const FINANCIAL_TERMS = ["revenue", "turnover", "ebitda", "profit", "debt", "cash", "assets", "liabilities", "borrowings"];
 const CHARGES_TERMS = ["charge", "charges", "security", "lender", "persons entitled"];
-const CHARGE_FIELD_REQUEST_TERMS = ["asset", "assets", "collateral", "cover", "covers", "covered", "description", "describe", "fixed charge", "floating charge", "secured over", "security covers", "security package", "what security"];
-const CHARGE_DESCRIPTIVE_TERMS = ["asset", "assets", "collateral", "debenture", "description", "fixed charge", "fixed and floating", "floating charge", "property", "secured over", "security covers", "security package", "undertaking"];
+const CHARGE_FIELD_REQUEST_TERMS = ["brief description", "asset", "assets", "collateral", "cover", "covers", "covered", "description", "describe", "fixed charge", "floating charge", "secured over", "security covers", "security package", "what security"];
+const CHARGE_DESCRIPTIVE_TERMS = ["brief description", "asset", "assets", "collateral", "debenture", "description", "fixed charge", "fixed and floating", "floating charge", "property", "secured over", "security covers", "security package", "undertaking"];
 const CHARGE_FIELD_TERMS = [
   "holder",
   "holds",
@@ -220,6 +220,7 @@ function relevantStructuredFacts(question: string, route: AnswerType): unknown[]
 
 function isChargeQuestion(q: string): boolean {
   if (CHARGES_TERMS.some((term) => q.includes(term))) return true;
+  if (/\bbrief\s+description\b/.test(q)) return true;
   const hasChargeFieldIntent = CHARGE_FIELD_TERMS.some((term) => q.includes(term));
   const hasChargeReference = chargeReferenceTokens(q).size > 0;
   return hasChargeFieldIntent && hasChargeReference;
@@ -314,7 +315,7 @@ function detectChargeFieldIntent(question: string): string {
   if (["fixed", "floating", "security type", "type of security"].some((term) => q.includes(term))) return "security_type";
   if (["obligations", "secured obligations", "liabilities secured"].some((term) => q.includes(term))) return "obligations_secured";
   if (["instrument", "debenture", "what does the charge say", "charge document"].some((term) => q.includes(term))) return "charge_instrument_summary";
-  if (q.includes("description")) return "charge_description";
+  if (q.includes("brief description") || q.includes("description")) return "charge_description";
   return "list_charges";
 }
 

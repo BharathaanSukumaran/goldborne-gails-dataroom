@@ -31,6 +31,7 @@ CHARGE_FIELD_TERMS = (
     "outstanding",
     "satisfied",
     "description",
+    "brief description",
     "short particulars",
     "particulars",
     "assets",
@@ -206,6 +207,8 @@ def answer_financial(question: str) -> StructuredAnswer:
 def is_charge_question(q: str) -> bool:
     if any(term in q for term in CHARGE_TOPIC_TERMS):
         return True
+    if re.search(r"\bbrief\s+description\b", q):
+        return True
     has_charge_field_intent = any(term in q for term in CHARGE_FIELD_TERMS)
     has_charge_reference = bool(_charge_reference_tokens(q))
     if has_charge_reference and re.search(r"\bwhat\s+(?:is|was|are|were)?\s*(?:the\s+)?(?:specific\s+)?charge\b", q):
@@ -314,7 +317,7 @@ def detect_charge_field_intent(question: str) -> str:
         return "obligations_secured"
     if any(term in q for term in ["instrument", "debenture", "what does the charge say", "charge document"]):
         return "charge_instrument_summary"
-    if "description" in q:
+    if "brief description" in q or "description" in q:
         return "charge_description"
     return "list_charges"
 

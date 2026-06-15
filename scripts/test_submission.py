@@ -66,6 +66,7 @@ REQUIRED_CHARGE_EVAL_CASE_IDS = {
     "charge_year_resolution_2021",
     "no_generic_answer_for_specific_charge_field",
     "what_is_charge_for_reviewed_summary",
+    "bare_brief_description_reviewed_summary",
 }
 
 CHECK_COMMANDS: dict[str, list[str]] = {

@@ -185,6 +185,18 @@ def test_charge_status_0005_specific_field_answer():
     assert body["citations"]
 
 
+def test_bare_brief_description_answers_registered_charge_descriptions():
+    response = client.post("/ask", json={"question": "Brief description"})
+    body = response.json()
+    assert response.status_code == 200
+    assert body["answer_type"] == "charges_security"
+    assert body["field_intent"] == "charge_description"
+    assert "No specific land, ship, aircraft or intellectual property" in body["answer"]
+    assert "Charge 0605 5393 0006" in body["answer"]
+    assert "Charge 0605 5393 0005" in body["answer"]
+    assert body["missing_information"] == []
+
+
 def test_charge_description_0006_answers_reviewed_brief_description():
     response = client.post("/ask", json={"question": "What is the description of charge 0006?"})
     body = response.json()

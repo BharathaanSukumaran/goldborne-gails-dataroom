@@ -19,7 +19,13 @@ const FIELD_LABELS: LabelDictionary = {
   source_status: "Status",
   included_reason: "Why included",
   local_path: "Local file",
-  financial_facts: "Financial figures"
+  financial_facts: "Financial figures",
+  revenue: "Revenue",
+  turnover: "Turnover",
+  EBITDA: "EBITDA",
+  ebitda: "EBITDA",
+  debt: "Debt",
+  borrowings: "Borrowings"
 };
 
 const CATEGORY_LABELS: LabelDictionary = {
@@ -62,6 +68,7 @@ const CONFIDENCE_LABELS: LabelDictionary = {
 
 const MISSING_INFORMATION_LABELS: LabelDictionary = {
   "reviewed usable financial_facts": "Financial figures are pending source review before use in answers.",
+  reviewed_usable_financial_facts: "Financial figures are pending source review before use in answers.",
   revenue: "Reviewed revenue figures are not available yet.",
   turnover: "Reviewed turnover figures are not available yet.",
   EBITDA: "Reviewed EBITDA figures are not available yet.",
@@ -72,11 +79,13 @@ const MISSING_INFORMATION_LABELS: LabelDictionary = {
   private_information_not_in_dataroom: "Private information is not available in this dataroom.",
   "supported financial metric": "No reviewed financial figures are available yet.",
   "retrieved manifest-backed evidence": "No matching reviewed source was found in the dataroom.",
+  retrieved_manifest_backed_evidence: "No matching reviewed source was found in the dataroom.",
   financial_facts: "No reviewed financial figures are available yet.",
   charges: "Reviewed charge details are not available yet.",
   "OpenAI Responses API completion": "The answer service is temporarily unavailable.",
-  USE_OPENAI_SYNTHESIS: "Answer synthesis is not enabled for this workspace.",
-  OPENAI_API_KEY: "Answer synthesis is not configured for this workspace."
+  openai_responses_api_completion: "The answer service is temporarily unavailable.",
+  use_openai_synthesis: "Answer synthesis is not enabled for this workspace.",
+  openai_api_key: "Answer synthesis is not configured for this workspace."
 };
 
 export function displayLabel(key: unknown): string {

@@ -148,15 +148,8 @@ def _unsupported_numeric_claims(
 
     allowed = _allowed_numeric_tokens(financial_facts, charges)
     for fact in answer.get("facts_used") or ():
-        if isinstance(fact, Mapping) and _is_financial_fact(fact) and not _is_usable_financial_fact(fact):
-            continue
         if isinstance(fact, Mapping):
-            _add_money_minor_tokens(allowed, fact.get("value_minor_units"))
-            _add_money_minor_tokens(allowed, fact.get("value"))
-            for value in fact.values():
-                _add_value_tokens(allowed, value)
-                _add_date_tokens(allowed, value)
-                _add_identifier_tokens(allowed, value)
+            _add_supported_fact_numeric_tokens(allowed, fact)
     unsupported: list[str] = []
     for claim in NUMERIC_CLAIM_RE.findall(str(answer.get("answer") or "")):
         normalized = _normalize_numeric_claim(claim)
@@ -267,6 +260,22 @@ def _allowed_numeric_tokens(
         _add_identifier_tokens(allowed, _field(charge, "charge_id"))
         _add_date_tokens(allowed, _field(charge, "created_on"))
     return allowed
+
+
+def _add_supported_fact_numeric_tokens(allowed: set[str], fact: Mapping[str, Any]) -> None:
+    if _is_financial_fact(fact):
+        if not _is_usable_financial_fact(fact):
+            return
+        _add_value_tokens(allowed, _field(fact, "value"))
+        _add_money_minor_tokens(allowed, _field(fact, "value_minor_units"))
+        _add_money_minor_tokens(allowed, _field(fact, "value"))
+        _add_date_tokens(allowed, _field(fact, "period_end") or _field(fact, "periodEnd"))
+        return
+
+    holder = _field(fact, "holder") or _field(fact, "persons_entitled")
+    if holder is not None or _field(fact, "charge_id") is not None or _field(fact, "chargeCode") is not None:
+        _add_identifier_tokens(allowed, _field(fact, "charge_id") or _field(fact, "chargeCode") or _field(fact, "charge_code"))
+        _add_date_tokens(allowed, _field(fact, "created_on") or _field(fact, "createdDate") or _field(fact, "created_date"))
 
 
 def _unsupported_financial_facts_used(

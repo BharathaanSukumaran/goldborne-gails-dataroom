@@ -52,6 +52,32 @@ def test_unknown_private_information_refuses():
     assert "cannot answer" in body["answer"]
 
 
+def test_ask_structured_routes_win_over_credit_narrative_terms():
+    response = client.post("/ask", json={"question": "For a credit memo, what lenders or charges are registered?"})
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["answer_type"] == "charges_security"
+    assert "Glas Trust Corporation Limited" in body["answer"]
+
+
+def test_ask_off_route_question_is_unavailable_not_retrieved_narrative(monkeypatch):
+    captured = []
+
+    def fake_synthesis(question, evidence):
+        captured.append(evidence)
+        return "Should not be used."
+
+    monkeypatch.setattr("backend.app.main.synthesize_with_openai", fake_synthesis)
+    response = client.post("/ask", json={"question": "What colour are the bakery walls?"})
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["answer_type"] == "unknown"
+    assert "not available" in body["answer"].lower()
+    assert captured == []
+
+
 def test_evals_run():
     response = client.post("/evals/run")
     body = response.json()

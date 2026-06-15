@@ -77,16 +77,16 @@ def answer_question(question: str) -> StructuredAnswer:
     q = question.lower()
     if any(term in q for term in ["revenue", "ebitda", "debt", "borrowings"]):
         return answer_financial(question)
-    if any(term in q for term in ["risk", "summary", "credit", "expansion"]):
-        return answer_narrative(question)
     if any(term in q for term in ["charge", "charges", "security", "lender"]):
         return answer_charges()
     if any(term in q for term in ["director", "directors", "management", "officer"]):
         return answer_directors()
     if any(term in q for term in ["owner", "ownership", "psc", "ultimate"]):
         return answer_ownership()
+    if any(term in q for term in ["risk", "summary", "credit", "expansion"]):
+        return answer_narrative(question)
     return StructuredAnswer(
-        answer="I cannot answer that from the current dataroom evidence.",
+        answer="This is not available in the current dataroom.",
         answer_type="unknown",
         missing_information=["No matching structured fact or retrieved evidence"],
         confidence="low",

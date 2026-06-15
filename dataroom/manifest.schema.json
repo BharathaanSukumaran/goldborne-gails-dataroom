@@ -133,7 +133,10 @@
               "pending_manual_curation",
               "downloaded",
               "processed",
-              "verified"
+              "verified",
+              "pending_review",
+              "failed",
+              "processing_failed"
             ]
           },
           "source_status": {
@@ -175,6 +178,10 @@
               "null"
             ],
             "minimum": 1
+          },
+          "page_count": {
+            "type": "integer",
+            "minimum": 0
           },
           "notes": {
             "type": "string"

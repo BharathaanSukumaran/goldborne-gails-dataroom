@@ -98,12 +98,24 @@ export default async (req: Request, _context: Context) => {
   const route = classifyQuestion(question);
   const evidence = buildEvidence(question, route);
 
+  if (route === "unknown" || route === "other") {
+    return Response.json(unknown(["supported dataroom question"]));
+  }
+
   if (route === "financial_metric" && !hasUsableFinancialValue(evidence)) {
     return Response.json(unknown(["reviewed usable financial_facts"]));
   }
 
+  if (route === "charges_security") {
+    return Response.json(structuredChargesAnswer());
+  }
+
+  if (route === "ownership_management") {
+    return Response.json(structuredOwnershipAnswer());
+  }
+
   if (!OPENAI_SYNTHESIS_ENABLED || !process.env.OPENAI_API_KEY) {
-    if (evidence.sourceChunks.length && ["credit_summary", "source_lookup", "other"].includes(route)) {
+    if (route === "source_lookup" && evidence.sourceChunks.length) {
       return Response.json(snippetOnlyAnswer(route, evidence));
     }
     const missing = [
@@ -132,9 +144,9 @@ function classifyQuestion(question: string): AnswerType {
   const q = question.toLowerCase();
   if (["covenant", "headroom", "private banking", "facility agreement"].some((term) => q.includes(term))) return "unknown";
   if (FINANCIAL_TERMS.some((term) => q.includes(term))) return "financial_metric";
-  if (CREDIT_TERMS.some((term) => q.includes(term))) return "credit_summary";
   if (CHARGES_TERMS.some((term) => q.includes(term))) return "charges_security";
   if (OWNERSHIP_TERMS.some((term) => q.includes(term))) return "ownership_management";
+  if (CREDIT_TERMS.some((term) => q.includes(term))) return "credit_summary";
   if (SOURCE_TERMS.some((term) => q.includes(term))) return "source_lookup";
   return "other";
 }
@@ -162,6 +174,45 @@ function relevantStructuredFacts(question: string, route: AnswerType): unknown[]
   if (route === "ownership_management" || OWNERSHIP_TERMS.some((term) => q.includes(term))) facts.push(...ownershipFacts, ...officerFacts);
 
   return facts;
+}
+
+function structuredChargesAnswer(): AskResponse {
+  const facts = chargeFacts.filter((fact) => sourceExists(factSourceId(fact) || ""));
+  if (!facts.length) return unknown(["charges"]);
+
+  return makeResponse({
+    answer: facts
+      .map((fact) => "Charge " + fact.chargeCode + " was created on " + fact.createdDate + "; status " + fact.status + "; holder/person entitled: " + fact.holder + ".")
+      .join(" "),
+    answerType: "charges_security",
+    factsUsed: facts,
+    citations: dedupeCitations(facts.map((fact) => citation(fact.sourceId, fact.sourceQuote, null))),
+    missingInformation: [],
+    confidence: "high"
+  });
+}
+
+function structuredOwnershipAnswer(): AskResponse {
+  const ownerFacts = ownershipFacts.filter((fact) => sourceExists(factSourceId(fact) || ""));
+  const currentOfficers = officerFacts.filter((fact) => fact.status === "current" && sourceExists(factSourceId(fact) || ""));
+  const facts = [...ownerFacts, ...currentOfficers];
+  if (!facts.length) return unknown(["ownership/PSC", "current directors"]);
+
+  const ownershipParts = ownerFacts.map((fact) => fact.ownerName + " is an " + fact.status + " " + fact.controlType + " with " + fact.percentageBand + " control.");
+  const officerParts = currentOfficers.map((fact) => fact.name + " (" + fact.role + ")");
+  const answerParts = [
+    ...ownershipParts,
+    officerParts.length ? "Current directors/officers in the dataroom: " + officerParts.join("; ") + "." : ""
+  ].filter(Boolean);
+
+  return makeResponse({
+    answer: answerParts.join(" "),
+    answerType: "ownership_management",
+    factsUsed: facts,
+    citations: dedupeCitations(facts.map((fact) => citation(fact.sourceId, fact.sourceQuote, null))),
+    missingInformation: [],
+    confidence: "high"
+  });
 }
 
 async function synthesizeAnswer(question: string, route: AnswerType, evidence: EvidencePacket): Promise<AskResponse> {

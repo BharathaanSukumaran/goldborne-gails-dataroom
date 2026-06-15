@@ -252,6 +252,22 @@ def test_verifier_blocks_unsupported_lender_names_but_allows_supported_holder():
     assert supported.passed is True
 
 
+def test_verifier_does_not_allow_numeric_claims_from_retrieved_snippet_payloads():
+    result = verify_answer(
+        {
+            "answer": "Revenue was GBP 214,000,000.",
+            "citations": [{"source_id": "processed-note"}],
+            "facts_used": [{"sourceId": "processed-note", "snippet": "Revenue was GBP 214,000,000."}],
+            "answer_type": "credit_summary",
+        },
+        financial_facts=[],
+        manifest_sources=[{"source_id": "processed-note"}],
+    )
+
+    assert result.passed is False
+    assert any("unsupported numeric claims" in error for error in result.errors)
+
+
 def test_verifier_rejects_empty_citation_source_id():
     result = verify_answer(
         {"answer": "Known answer", "citations": [{"source_id": ""}], "facts_used": [], "answer_type": "structured"},

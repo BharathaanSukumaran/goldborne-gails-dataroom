@@ -372,9 +372,10 @@ function FactCard({
 }) {
   const display = factDisplay(fact, index, sourceTitlesById);
   const rows = [
-    { label: "Fact", value: display.fact },
-    { label: "Value", value: display.value },
+    { label: "Metric", value: display.metric },
     { label: "Period", value: display.period },
+    { label: "Value", value: display.value },
+    { label: "Basis", value: display.basis },
     { label: "Source", value: display.source },
     { label: "Status", value: display.status }
   ];
@@ -383,7 +384,7 @@ function FactCard({
     <article className="rounded-md border border-line bg-white p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink">{display.fact}</p>
+          <p className="text-sm font-semibold text-ink">{display.metric}</p>
           {display.value ? <p className="mt-1 break-words text-sm font-semibold text-moss">{display.value}</p> : null}
         </div>
         <span className="shrink-0 rounded-full border border-line bg-paper px-2 py-0.5 text-xs text-ink/60">
@@ -403,7 +404,7 @@ function FactCard({
 }
 
 function factDisplay(fact: ReviewedFact, index: number, sourceTitlesById: Map<string, string>) {
-  const factName = findFirstEntry(fact, [
+  const metric = findFirstEntry(fact, [
     "metric",
     "charge_id",
     "charge_code",
@@ -419,11 +420,13 @@ function factDisplay(fact: ReviewedFact, index: number, sourceTitlesById: Map<st
     "type"
   ]);
   const sourceId = findFirstValue(fact, ["source_document_id", "sourceDocumentId", "source_id", "sourceId"]);
+  const basis = findFirstValue(fact, ["reportedOrComputed", "reported_or_computed", "basis"]);
 
   return {
-    fact: formatFactName(factName, index),
+    metric: formatFactName(metric, index),
     value: formatFactValue(fact),
     period: findFirstValue(fact, ["period", "periodEnd", "period_end", "year", "created_date", "created_on", "date"]),
+    basis: displayBasis(basis) || "Reviewed source",
     source: cleanSourceValue(
       findFirstValue(fact, ["source_title", "sourceTitle", "source_name", "sourceName", "source"]),
       sourceId,
@@ -499,8 +502,7 @@ function formatFactStatus(fact: ReviewedFact) {
   const status = findFirstValue(fact, ["status", "source_status", "processing_status"]);
   if (status) return statusLabel(status);
 
-  const basis = findFirstValue(fact, ["reportedOrComputed", "reported_or_computed", "basis"]);
-  return displayBasis(basis) || "Reviewed";
+  return "Reviewed";
 }
 
 function findFirstEntry(record: ReviewedFact, keys: string[]) {

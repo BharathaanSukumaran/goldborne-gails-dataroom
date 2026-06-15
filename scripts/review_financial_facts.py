@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Promote manually reviewed financial facts for exact-answer use.
 
-This script does not review facts itself. It applies reviewer decisions from a
-small JSON file so promotion is explicit and auditable.
+This script does not review facts itself. It either lists pending candidate facts
+or applies reviewer decisions from a small JSON file so promotion is explicit
+and auditable.
 
 Review decision file shape:
 {
@@ -23,18 +24,31 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FACTS = ROOT / "backend" / "data" / "financial_facts.json"
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("decisions", type=Path, help="JSON file containing approved fact keys")
-    parser.add_argument("--facts", type=Path, default=DEFAULT_FACTS)
-    parser.add_argument("--output", type=Path, default=DEFAULT_FACTS)
-    args = parser.parse_args()
-
-    payload = json.loads(args.facts.read_text(encoding="utf-8"))
+def load_facts(path: Path) -> list[dict[str, Any]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
     facts = payload.get("facts", payload)
-    decisions = json.loads(args.decisions.read_text(encoding="utf-8"))
-    approved = {key(item) for item in decisions.get("approved", [])}
+    if not isinstance(facts, list):
+        raise SystemExit("Financial facts file must contain a list or {'facts': [...]} payload")
+    return facts
 
+
+def list_pending(facts: list[dict[str, Any]]) -> None:
+    candidates = [fact for fact in facts if fact.get("value") not in {None, ""} and not fact.get("usedInAnswers")]
+    if not candidates:
+        print("No pending extracted financial fact candidates with values.")
+        return
+    for index, fact in enumerate(candidates, start=1):
+        page = fact.get("page") if fact.get("page") is not None else "missing-page"
+        print(
+            f"{index}. {fact.get('periodEnd')} {fact.get('metric')}={fact.get('value')} "
+            f"source={fact.get('sourceId')} page={page} reviewed={fact.get('reviewed')} usedInAnswers={fact.get('usedInAnswers')}"
+        )
+        print(f"   quote: {fact.get('quote')}")
+
+
+def apply_decisions(facts: list[dict[str, Any]], decisions_path: Path) -> int:
+    decisions = json.loads(decisions_path.read_text(encoding="utf-8"))
+    approved = {key(item) for item in decisions.get("approved", [])}
     promoted = 0
     for fact in facts:
         if key(fact) in approved:
@@ -45,9 +59,27 @@ def main() -> None:
             fact["reviewed"] = True
             fact["usedInAnswers"] = True
             promoted += 1
-        else:
-            fact["usedInAnswers"] = False if not fact.get("reviewed") else bool(fact.get("usedInAnswers", False))
+        elif not fact.get("reviewed"):
+            fact["usedInAnswers"] = False
+    return promoted
 
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("decisions", type=Path, nargs="?", help="JSON file containing approved fact keys")
+    parser.add_argument("--facts", type=Path, default=DEFAULT_FACTS)
+    parser.add_argument("--output", type=Path, default=DEFAULT_FACTS)
+    parser.add_argument("--list-pending", action="store_true", help="Print candidate facts requiring manual review and exit.")
+    args = parser.parse_args()
+
+    facts = load_facts(args.facts)
+    if args.list_pending:
+        list_pending(facts)
+        return
+    if args.decisions is None:
+        raise SystemExit("Provide a decisions JSON file, or use --list-pending to inspect candidates.")
+
+    promoted = apply_decisions(facts, args.decisions)
     args.output.write_text(json.dumps({"facts": facts}, indent=2) + "\n", encoding="utf-8")
     print(f"Promoted {promoted} reviewed financial facts for exact answers")
 

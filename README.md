@@ -1,18 +1,124 @@
-# Goldborne Capital Intelligence Platform
+# Goldborne Capital GAIL'S Dataroom
 
-AI-powered company intelligence, credit analysis, and dataroom interrogation platform for Goldborne Capital. GAIL'S LIMITED / Gail's Bakery, company number `06055393`, is the initial selected workspace and case study.
+Public-source AI dataroom assistant for Goldborne Capital's GAIL'S LIMITED case study. The app ingests Companies House and curated public-source material, registers sources in a manifest, exposes a chat-first diligence UI, and answers only from structured facts or cited retrieved evidence.
 
 Live demo: https://goldborne-gails-dataroom.netlify.app
 
-The project combines a curated public dataroom, a FastAPI backend, Netlify serverless API functions, and a Next.js frontend. The platform answers credit and diligence questions with citations, routes exact financial/legal questions through structured facts, and says when the workspace dataroom does not contain enough evidence.
+Current honesty check: the dataroom has source coverage and structured answer paths, but it currently has `0` reviewed usable financial facts. Revenue, EBITDA, debt, cash, and profit figures must therefore return unavailable until source-account extraction and human review are completed.
+
+## What The App Does
+
+- Answers diligence questions for GAIL'S LIMITED, company number `06055393`.
+- Uses `dataroom/manifest.json` as the source registry for public filings and curated public context.
+- Routes exact financial questions through reviewed structured facts before any narrative synthesis.
+- Routes charges, ownership, and management questions through structured records and cited sources.
+- Uses manifest-backed retrieval for narrative questions such as business, ownership, and credit context.
+- Uses OpenAI server-side only, when configured, for grounded synthesis over retrieved evidence.
+- Refuses unsupported questions and missing financial values instead of inventing numbers.
 
 ## Repository Layout
 
-- `dataroom/` - manifest, source notes, raw source placeholders, processed notes, and coverage metadata.
-- `backend/` - FastAPI API, SQLite-backed structured facts, retrieval/QA helpers, and pytest tests.
-- `frontend/` - Next.js chat UI and source browser.
-- `scripts/` - ingestion and extraction scripts for Companies House, document processing, and financial facts.
-- `writeup.md` - one-page technical writeup and future work.
+- `dataroom/` - source manifest, raw Companies House files, processed snippets, processing error records, and coverage metadata.
+- `backend/` - FastAPI API, SQLite/JSON structured facts, retrieval and verifier logic, pytest tests, and eval cases.
+- `frontend/` - Next.js chatbot UI, source drawer, reviewed facts view, and frontend smoke tests.
+- `netlify/functions/` - Netlify API functions for deployed `/api/health`, `/api/sources`, and `/api/ask`.
+- `scripts/` - ingestion, processing, extraction, review, eval, submission-check, and production-verification scripts.
+- `writeup.md` - short technical submission writeup.
+
+## Architecture
+
+```text
+Browser UI
+-> Netlify API function or FastAPI endpoint
+-> question classifier
+-> structured facts first for financials / charges / ownership
+-> manifest-backed retrieval for narrative answers
+-> OpenAI Responses API server-side synthesis when enabled
+-> verifier
+-> cited answer or unavailable response
+```
+
+The frontend does not call OpenAI directly and must not receive `OPENAI_API_KEY`. Browser-visible configuration is limited to values such as `NEXT_PUBLIC_API_BASE_URL`.
+
+## Ingestion Pipeline
+
+The pipeline is intentionally small but real:
+
+1. `scripts/ingest_companies_house.py` refreshes Companies House profile and filing-history metadata for `06055393`, identifies the latest three relevant parent accounts filings, stores raw files under `dataroom/raw/companies_house/`, and updates `dataroom/manifest.json`.
+2. `scripts/process_documents.py` converts local documents into page-level processed text where possible, writes processed files under `dataroom/processed/`, and creates explicit `.processing_error.json` records when parsing fails.
+3. `scripts/extract_financials.py` scans processed account text for candidate metrics and writes `backend/data/financial_facts.json`.
+4. `scripts/review_financial_facts.py` lists candidates and promotes only explicitly approved facts by setting both `reviewed: true` and `usedInAnswers: true`.
+5. `scripts/build_dataroom.py` runs ingest, process, extract, and validation, then prints source/fact coverage.
+
+Current pipeline state: the three parent consolidated accounts for 2025, 2024, and 2023 are registered, but their processing status is `processing_failed` because usable account text/table extraction is not yet available. `backend/data/financial_facts.json` contains unreviewed placeholder/candidate records with no extracted values, so there are `0` extracted candidate values and `0` reviewed usable financial facts.
+
+## Run The Pipeline
+
+Use the normal pipeline command when missing reviewed financial facts should fail the build:
+
+```bash
+python3 scripts/build_dataroom.py
+```
+
+For the current submission/demo state, where missing revenue, EBITDA, and debt are expected and must remain unavailable, run:
+
+```bash
+python3 scripts/build_dataroom.py --allow-missing-critical
+```
+
+Run individual steps when debugging:
+
+```bash
+python3 scripts/ingest_companies_house.py
+python3 scripts/process_documents.py --process --update-manifest
+python3 scripts/extract_financials.py
+python3 scripts/process_documents.py --update-manifest
+```
+
+## Reviewed Financial Facts
+
+Financial values are never trusted from model output. A financial fact can be used in an answer only when both gates are true:
+
+- `reviewed: true` - a human checked the metric, period, value, source, page, and quote against the original source.
+- `usedInAnswers: true` - the reviewed fact is approved for final answer generation.
+
+List pending candidate facts:
+
+```bash
+python3 scripts/review_financial_facts.py --list-pending
+```
+
+Promote explicitly reviewed facts with a decision file:
+
+```json
+{
+  "approved": [
+    {
+      "workspaceId": "gails-limited",
+      "periodEnd": "2025-02-28",
+      "metric": "revenue",
+      "sourceId": "ch-parent-accounts-2025"
+    }
+  ]
+}
+```
+
+```bash
+python3 scripts/review_financial_facts.py review-decisions.json
+```
+
+The review script does not auto-approve facts. It also rejects approvals without a value, page, and quote.
+
+## Why Financial Values Are Unavailable
+
+The public dataroom currently lacks reviewed, answer-approved financial facts. The latest parent accounts are present in the manifest, but the PDF text/table extraction has not produced usable reviewed values. Because of that:
+
+- revenue/turnover is unavailable;
+- EBITDA is unavailable unless directly reviewed or computable from reviewed operating profit, depreciation, and amortisation for the same period;
+- debt/borrowings is unavailable;
+- covenant headroom and private facility terms are unavailable in the public dataroom.
+
+This is expected behavior. The assistant should say the values are unavailable and list the missing reviewed facts rather than approximate figures from memory or model synthesis.
 
 ## Local Setup
 
@@ -20,7 +126,7 @@ Prerequisites:
 
 - Python 3.11+
 - Node.js 20+
-- An OpenAI API key only if enabling narrative synthesis
+- OpenAI API key only if enabling server-side narrative synthesis
 
 Create environment files:
 
@@ -33,7 +139,7 @@ Install backend dependencies:
 
 ```bash
 cd backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -60,7 +166,7 @@ cd frontend
 npm run dev
 ```
 
-Open `http://localhost:3000`. The frontend calls the backend at `NEXT_PUBLIC_API_BASE_URL`, which defaults to `http://localhost:8000`.
+Open `http://localhost:3000`. The frontend defaults to the local backend through `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` when configured, or `/api` in the Netlify deployment path.
 
 Useful API checks:
 
@@ -71,6 +177,53 @@ curl -X POST http://localhost:8000/ask \
   -H "Content-Type: application/json" \
   -d '{"question":"What charges are registered against the company and who holds them?"}'
 ```
+
+## OpenAI Use
+
+OpenAI is optional and server-side:
+
+- FastAPI and Netlify functions read `process.env.OPENAI_API_KEY`.
+- `USE_OPENAI_SYNTHESIS=true` enables model-backed narrative synthesis.
+- `OPENAI_MODEL` selects the synthesis model.
+- If the key is missing or synthesis is disabled, the API returns a deterministic retrieved-snippet fallback or a clear unavailable/configuration response.
+- Exact financial figures, lenders, directors, ownership, charges, and dates must be supported by structured facts or retrieved citations.
+
+Do not set `OPENAI_API_KEY` in `frontend/.env.local`, do not prefix it with `NEXT_PUBLIC_`, and do not call OpenAI from browser code.
+
+## Environment Variables
+
+Backend / Netlify server variables:
+
+```text
+DATABASE_URL=sqlite:///./dataroom.sqlite
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
+USE_OPENAI_SYNTHESIS=true
+```
+
+Frontend variable:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+Leave `NEXT_PUBLIC_API_BASE_URL` unset on Netlify when the deployed frontend should call bundled Netlify functions at `/api`. Set it only when pointing the frontend at a separately hosted FastAPI backend.
+
+## Local Tests And Submission Check
+
+Run the complete local gate:
+
+```bash
+python3 scripts/test_submission.py
+```
+
+Equivalent wrapper:
+
+```bash
+scripts/run_local_smoke.sh
+```
+
+The submission check runs backend pytest, offline evals, frontend lint, frontend build, frontend smoke tests, raw-label scan, secret scan, and manifest validation. It prints `SUBMISSION CHECK: PASS` or `SUBMISSION CHECK: FAIL`.
 
 Run backend tests:
 
@@ -83,13 +236,8 @@ pytest
 Run answer-quality evals:
 
 ```bash
-python scripts/run_evals.py --responses backend/app/evals/sample_responses.json
-```
-
-For live backend evals, start the backend and run:
-
-```bash
-python scripts/run_evals.py --base-url http://127.0.0.1:8000
+python3 scripts/run_evals.py --responses backend/app/evals/sample_responses.json
+python3 scripts/run_evals.py --base-url http://127.0.0.1:8000
 ```
 
 Run frontend checks:
@@ -98,114 +246,14 @@ Run frontend checks:
 cd frontend
 npm run lint
 npm run build
+npm run test
 ```
-
-
-## Environment Variables
-
-Backend variables:
-
-- `DATABASE_URL` - database connection string. Defaults to a local SQLite file. Use SQLite for local/demo, or a managed Postgres URL for production once the backend DB layer is configured for it.
-- `OPENAI_API_KEY` - server-side OpenAI key. Leave blank to disable model synthesis.
-- `OPENAI_MODEL` - model for narrative synthesis. Defaults to a small cost-effective model.
-- `USE_OPENAI_SYNTHESIS` - set to `true` to allow server-side OpenAI narrative synthesis. Keep `false` for deterministic local testing.
-
-Frontend variables:
-
-- `NEXT_PUBLIC_API_BASE_URL` - public URL of the FastAPI backend. This is safe to expose because it is only an API base URL, not a secret.
-
-Security notes:
-
-- Do not put `OPENAI_API_KEY` or private credentials in frontend environment variables.
-- Do not commit `.env` or `frontend/.env.local`.
-- The public frontend must never call OpenAI directly; all AI calls belong behind the backend.
-
-## Architecture
-
-Text diagram:
-
-```text
-Browser UI -> /api/ask or FastAPI /ask -> question routing
-  -> structured facts for financials / charges / ownership
-  -> manifest-backed snippet retrieval for narrative questions
-  -> server-side OpenAI Responses API synthesis when OPENAI_API_KEY is set
-  -> verifier -> cited answer / unknown response
-```
-
-The app uses a two-track answering flow.
-
-Structured questions are classified by topic and answered from typed facts:
-
-- Financial questions use exact stored facts for revenue, EBITDA, debt, period end, units, source page, quote, and review status.
-- Charges questions use registered charge records, status, dates, and persons entitled.
-- Ownership and management questions use PSC and officer/director records.
-
-Narrative questions use retrieval over manifest-backed dataroom text snippets and, when enabled, server-side OpenAI Responses API synthesis through the official OpenAI SDK in Netlify functions or the FastAPI backend. The model receives only selected evidence and is instructed not to invent figures, dates, lenders, ownership, or charges.
-
-The frontend is intentionally thin: it renders the Goldborne platform shell, selected workspace, suggested prompts, source browser, and chat UI. It sends `POST /api/ask` on Netlify or `POST /ask` to FastAPI, displays confidence and missing information, and shows citations/source snippets. It only needs `NEXT_PUBLIC_API_BASE_URL` when using a separate backend.
-
-## Dataroom Sources
-
-`dataroom/manifest.json` is the source registry. The current workspace has 12 registered sources, of which 9 are indexed through curated Markdown snippets under `dataroom/processed/`. `/api/sources` reports `source_count`, `indexed_source_count`, categories, and enriched source metadata. The UI source browser reads this endpoint, so the workspace shows visible indexed sources instead of a static zero-source state.
-
-The latest three Companies House parent consolidated accounts PDFs are downloaded under `dataroom/raw/companies_house/` and registered as `downloaded`/`pending`. They are intentionally not answerable financial sources yet: OCR/table extraction and human source-page review are still pending, so revenue, EBITDA, and debt remain unavailable from reviewed facts.
-
-## Accuracy Approach
-
-Financial and legal facts are not left to generative output. Exact values are extracted into structured records with source IDs, page/snippet evidence, and review metadata. The assistant should:
-
-- prefer structured facts for revenue, EBITDA, debt, charges, directors, and ownership;
-- compute EBITDA only when every required component is present and cite the formula;
-- mark EBITDA as reported, computed, or unknown;
-- block or downgrade answers with unsupported numeric claims;
-- return an unknown answer when evidence is absent instead of filling gaps;
-- cite every substantive answer with manifest-backed source IDs.
-
-The current dataroom manifest also records processing status. Pending sources should not be treated as verified until raw files are downloaded, parsed, and reviewed.
-
-### Financial Fact Review Gate
-
-Financial facts may be stored for review even when they are not safe to answer from. Exact financial answers must only use facts where both gates are true:
-
-- `reviewed: true` means a human checked the extracted value, period, metric, source page, and quote against the original source.
-- `usedInAnswers: true` in JSON, or `used_in_answers: true` in SQLite or CSV, means the reviewed fact is approved for final answer generation.
-
-Leave either flag false for OCR output, parser output, placeholders, incomplete EBITDA components, or values awaiting source-page review. Unreviewed facts can still be displayed in review and admin surfaces, but they must not appear in `facts_used`, citations, or exact final financial answers. EBITDA may only be reported directly from a usable EBITDA fact or computed from complete usable operating profit, depreciation, and amortisation facts.
-
-
-## Backend Deployment
-
-One practical deployment path is Render, Fly.io, Railway, or another container/Python host.
-
-Backend steps:
-
-1. Create a backend service rooted at `backend/`.
-2. Install with `pip install -r requirements.txt`.
-3. Start with:
-
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
-```
-
-4. Set production environment variables:
-
-```text
-DATABASE_URL=sqlite:////data/dataroom.sqlite
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-4.1-mini
-USE_OPENAI_SYNTHESIS=true
-```
-
-5. Persist the SQLite volume if using SQLite. For multi-instance or long-lived production, move structured facts to Postgres and set `DATABASE_URL` accordingly.
-6. Confirm `GET /health`, `GET /sources`, and a known `POST /ask` request before pointing the frontend at the service.
 
 ## Netlify Deployment
 
-The repository includes `netlify.toml` for a root Netlify deploy. Netlify installs root dependencies for `netlify/functions`, installs the frontend with `npm ci`, then builds the Next.js app from `frontend/`.
+The repository includes `netlify.toml` for a root Netlify deploy. Netlify installs root dependencies for `netlify/functions`, installs the frontend, then builds the Next.js app from `frontend/`.
 
-The prior production mismatch was caused by Netlify serving an older frontend-oriented deployment instead of the root deployment described here. That stale deployment did not bundle the current Netlify functions and dataroom artifacts, so the live UI showed the old product copy and a zero-indexed-source state even though the repository contained the Goldborne UI and 12-source manifest.
-
-Netlify build settings:
+Build settings:
 
 ```text
 Base directory: .
@@ -214,7 +262,7 @@ Publish directory: frontend/.next
 Functions directory: netlify/functions
 ```
 
-Set these Netlify environment variables when enabling model-backed synthesis:
+Set server-only Netlify environment variables when enabling synthesis:
 
 ```text
 OPENAI_API_KEY=...
@@ -222,46 +270,50 @@ OPENAI_MODEL=gpt-4.1-mini
 USE_OPENAI_SYNTHESIS=true
 ```
 
-These OpenAI variables are server-only deployment secrets for Netlify functions or the FastAPI backend. Do not expose them with `NEXT_PUBLIC_*` names or place them in browser-readable frontend env files.
+Optional:
 
-If the deployed UI should call the bundled Netlify functions, leave `NEXT_PUBLIC_API_BASE_URL` unset so it defaults to `/api`. Set it only when pointing the frontend at a separate backend service. Confirm the deployed UI can load `/api/sources` and submit `/api/ask` questions.
+```text
+NEXT_PUBLIC_API_BASE_URL=
+```
 
-Run the production verification script after deployment:
+Keep `NEXT_PUBLIC_API_BASE_URL` empty for bundled Netlify functions. Use a full backend URL only for a separate backend deployment.
+
+## Production Verification
+
+After deploying, run:
 
 ```bash
 scripts/verify_production.sh https://goldborne-gails-dataroom.netlify.app
 ```
 
-The script fetches the deployed page and `/api/sources`, fails if the stale `0 indexed sources` UI is still present, and checks for at least 12 sources and 9 indexed sources.
-
-If the frontend and backend are on different domains, configure backend CORS for the frontend origin before production use.
-
-## Dataroom Refresh
-
-The manifest is the source registry. Add or refresh documents by updating `dataroom/manifest.json`, placing raw files under `dataroom/raw/`, and running processing/extraction scripts. Only promote a source to `verified` after source text and extracted facts have been checked against the original filing or article notes.
+The script checks the homepage, `/api/health`, `/api/sources`, normal `/api/ask`, unavailable financial answers, unavailable covenant/private-term answers, citations where evidence exists, and stale UI symptoms such as old copy or `0 indexed sources`.
 
 ## Deployment Checklist
 
-- Backend health check returns `{"status":"ok"}`.
-- Netlify root dependencies install before function bundling.
-- Frontend `NEXT_PUBLIC_API_BASE_URL` is unset for bundled Netlify functions or points to the deployed backend.
-- `OPENAI_MODEL` is set with `OPENAI_API_KEY` when OpenAI synthesis is enabled.
-- `OPENAI_API_KEY` exists only on the backend host.
-- `.env` files are not committed.
-- Dataroom raw/processed files needed for demo questions are present.
-- Demo questions return citations or clear missing-information messages.
-- Financial values used in answers are reviewed structured facts, not model guesses.
+- The homepage shows Goldborne Capital and GAIL'S Limited.
+- `/api/health` returns ok.
+- `/api/sources` returns nonzero sources and indexed sources.
+- `/api/ask` returns cited evidence where the dataroom supports the answer.
+- Financial questions with no reviewed usable facts return unavailable and do not include invented numbers.
+- `OPENAI_API_KEY` exists only in backend/Netlify server environment variables.
+- `USE_OPENAI_SYNTHESIS` is intentionally set for the deployment mode.
+- `.env` and `frontend/.env.local` are not committed.
+- Production verification passes after deploy.
 
 ## Known Limitations
 
-- The latest three Companies House accounts PDFs have been downloaded but still require OCR/table extraction and human review before they can support exact financial answers.
-- Revenue, EBITDA, and debt remain unavailable until those source accounts are reviewed and approved through the reviewed-facts gate.
-- Without `OPENAI_API_KEY`, Netlify narrative synthesis falls back to retrieved snippets or returns a low-confidence unknown response.
-- Root npm install currently reports audit advisories in Netlify dependency transitive packages; no force upgrade was applied.
+- The latest three parent consolidated accounts are registered, but PDF processing currently fails into explicit processing-error records.
+- There are currently `0` reviewed usable financial facts, so exact revenue, EBITDA, debt, cash, and profit answers are unavailable.
+- Curated public-news sources are intentionally lightweight and should be expanded with licensing-safe excerpts before broader use.
+- The review workflow is CLI-based rather than a full human review UI.
+- OpenAI synthesis is optional; without server-side configuration, narrative answers fall back to deterministic retrieval or unavailable responses.
+- SQLite is suitable for local/demo use; a managed database is preferable for long-lived multi-user production.
 
-## Future Improvements
+## Future Work
 
-- Full PDF download, OCR, and table extraction for Companies House filings.
-- Human review queue for promoted financial facts.
-- Workspace selector backed by multiple companies.
-- Authenticated client workspaces and access control.
+- Improve OCR and table extraction for Companies House PDFs.
+- Add a reviewer UI with audit trail from source page to approved fact to final answer.
+- Schedule Companies House refreshes with manifest diffs and stale-source alerts.
+- Expand public source coverage beyond Companies House and curated notes.
+- Add authentication and access control for non-public datarooms.
+- Broaden credit analysis to covenants, liquidity, security package, operating risks, and sensitivity analysis once supported sources are available.

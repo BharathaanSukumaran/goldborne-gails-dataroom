@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-14T23:34:57Z",
+  "generated_at": "2026-06-15T08:51:42Z",
   "company": {
     "legal_name": "GAIL'S LIMITED",
     "company_number": "06055393",
@@ -17,8 +17,8 @@
     "ownership": 1
   },
   "processing_status_counts": {
-    "downloaded": 3,
-    "processed": 9
+    "processed": 9,
+    "processing_failed": 3
   },
   "source_status_counts": {
     "pending": 3,
@@ -31,7 +31,8 @@
       "period_end": "2025-02-28",
       "filed_at": "2025-11-27",
       "pages": 55,
-      "processing_status": "downloaded",
+      "page_count": 0,
+      "processing_status": "processing_failed",
       "source_status": "pending"
     },
     {
@@ -39,7 +40,8 @@
       "period_end": "2024-02-29",
       "filed_at": "2024-11-25",
       "pages": 58,
-      "processing_status": "downloaded",
+      "page_count": 0,
+      "processing_status": "processing_failed",
       "source_status": "pending"
     },
     {
@@ -47,7 +49,8 @@
       "period_end": "2023-02-28",
       "filed_at": "2023-11-28",
       "pages": 49,
-      "processing_status": "downloaded",
+      "page_count": 0,
+      "processing_status": "processing_failed",
       "source_status": "pending"
     }
   ],
@@ -67,7 +70,47 @@
     "news-expansion-2025-placeholder",
     "news-community-context-2024-placeholder"
   ],
-  "issues": [],
+  "issues": [
+    {
+      "source_id": "ch-parent-accounts-2025",
+      "category": "accounts",
+      "title": "Parent consolidated accounts, period ending 28 February 2025",
+      "processing_status": "processing_failed",
+      "source_status": "pending",
+      "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2025.pdf",
+      "local_exists": true,
+      "processed_path": "dataroom/processed/ch-parent-accounts-2025.processing_error.json",
+      "processed_exists": true,
+      "page_count": 55,
+      "issue": "source processing failed; inspect processed error record"
+    },
+    {
+      "source_id": "ch-parent-accounts-2024",
+      "category": "accounts",
+      "title": "Parent consolidated accounts, period ending 29 February 2024",
+      "processing_status": "processing_failed",
+      "source_status": "pending",
+      "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2024.pdf",
+      "local_exists": true,
+      "processed_path": "dataroom/processed/ch-parent-accounts-2024.processing_error.json",
+      "processed_exists": true,
+      "page_count": 58,
+      "issue": "source processing failed; inspect processed error record"
+    },
+    {
+      "source_id": "ch-parent-accounts-2023",
+      "category": "accounts",
+      "title": "Parent consolidated accounts, period ending 28 February 2023",
+      "processing_status": "processing_failed",
+      "source_status": "pending",
+      "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2023.pdf",
+      "local_exists": true,
+      "processed_path": "dataroom/processed/ch-parent-accounts-2023.processing_error.json",
+      "processed_exists": true,
+      "page_count": 49,
+      "issue": "source processing failed; inspect processed error record"
+    }
+  ],
   "sources": [
     {
       "source_id": "ch-profile-06055393",
@@ -79,6 +122,7 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/ch_profile_06055393.md",
       "processed_exists": true,
+      "page_count": 0,
       "issue": null
     },
     {
@@ -91,43 +135,47 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/ch_filing_history_06055393.md",
       "processed_exists": true,
+      "page_count": 0,
       "issue": null
     },
     {
       "source_id": "ch-parent-accounts-2025",
       "category": "accounts",
       "title": "Parent consolidated accounts, period ending 28 February 2025",
-      "processing_status": "downloaded",
+      "processing_status": "processing_failed",
       "source_status": "pending",
       "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2025.pdf",
       "local_exists": true,
-      "processed_path": null,
-      "processed_exists": false,
-      "issue": null
+      "processed_path": "dataroom/processed/ch-parent-accounts-2025.processing_error.json",
+      "processed_exists": true,
+      "page_count": 55,
+      "issue": "source processing failed; inspect processed error record"
     },
     {
       "source_id": "ch-parent-accounts-2024",
       "category": "accounts",
       "title": "Parent consolidated accounts, period ending 29 February 2024",
-      "processing_status": "downloaded",
+      "processing_status": "processing_failed",
       "source_status": "pending",
       "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2024.pdf",
       "local_exists": true,
-      "processed_path": null,
-      "processed_exists": false,
-      "issue": null
+      "processed_path": "dataroom/processed/ch-parent-accounts-2024.processing_error.json",
+      "processed_exists": true,
+      "page_count": 58,
+      "issue": "source processing failed; inspect processed error record"
     },
     {
       "source_id": "ch-parent-accounts-2023",
       "category": "accounts",
       "title": "Parent consolidated accounts, period ending 28 February 2023",
-      "processing_status": "downloaded",
+      "processing_status": "processing_failed",
       "source_status": "pending",
       "local_path": "dataroom/raw/companies_house/ch-parent-accounts-2023.pdf",
       "local_exists": true,
-      "processed_path": null,
-      "processed_exists": false,
-      "issue": null
+      "processed_path": "dataroom/processed/ch-parent-accounts-2023.processing_error.json",
+      "processed_exists": true,
+      "page_count": 49,
+      "issue": "source processing failed; inspect processed error record"
     },
     {
       "source_id": "ch-charges-register-06055393",
@@ -139,6 +187,7 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/ch_charges_register.md",
       "processed_exists": true,
+      "page_count": 0,
       "issue": null
     },
     {
@@ -151,6 +200,7 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/ch_charge_0006.md",
       "processed_exists": true,
+      "page_count": 67,
       "issue": null
     },
     {
@@ -163,6 +213,7 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/ch_charge_0005.md",
       "processed_exists": true,
+      "page_count": 0,
       "issue": null
     },
     {
@@ -175,6 +226,7 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/ch_officers_06055393.md",
       "processed_exists": true,
+      "page_count": 0,
       "issue": null
     },
     {
@@ -187,6 +239,7 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/ch_psc_06055393.md",
       "processed_exists": true,
+      "page_count": 0,
       "issue": null
     },
     {
@@ -199,6 +252,7 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/guardian_expansion_2025.md",
       "processed_exists": true,
+      "page_count": 0,
       "issue": null
     },
     {
@@ -211,6 +265,7 @@
       "local_exists": false,
       "processed_path": "dataroom/processed/guardian_community_2024.md",
       "processed_exists": true,
+      "page_count": 0,
       "issue": null
     }
   ]

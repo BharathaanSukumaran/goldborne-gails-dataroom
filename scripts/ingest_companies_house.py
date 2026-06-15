@@ -83,6 +83,7 @@ def source(
         "filed_at": filed_at,
         "period_end": period_end,
         "pages": pages,
+        "page_count": pages or 0,
         "notes": notes,
         "source_status": source_status,
     }
@@ -111,15 +112,25 @@ def source_status_for(processing_status: str) -> str:
 
 
 def refresh_source_readiness(source_item: dict[str, Any], existing: dict[str, Any] | None) -> dict[str, Any]:
-    """Preserve curated processed sources while keeping missing accounts pending."""
-    processed_path = (existing or {}).get("processed_path") or PROCESSED_PATH_BY_SOURCE_ID.get(source_item["source_id"])
+    """Preserve curated processed sources while keeping failed processing visible."""
+    existing = existing or {}
+    if existing.get("processing_status") == "processing_failed":
+        source_item["processing_status"] = "processing_failed"
+        source_item["source_status"] = source_status_for("processing_failed")
+        if existing.get("processed_path"):
+            source_item["processed_path"] = existing["processed_path"]
+        source_item["page_count"] = existing.get("page_count", 0)
+        return source_item
+
+    processed_path = existing.get("processed_path") or PROCESSED_PATH_BY_SOURCE_ID.get(source_item["source_id"])
     if processed_path and (ROOT / processed_path).exists():
         source_item["processed_path"] = processed_path
-        if (existing or {}).get("processing_status") == "verified":
+        if existing.get("processing_status") == "verified":
             source_item["processing_status"] = "verified"
         else:
             source_item["processing_status"] = "processed"
         source_item["source_status"] = source_status_for(source_item["processing_status"])
+        source_item["page_count"] = existing.get("page_count", source_item.get("page_count", 0))
         return source_item
 
     if (ROOT / source_item["local_path"]).exists():

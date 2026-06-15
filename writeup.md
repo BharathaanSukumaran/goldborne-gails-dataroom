@@ -1,28 +1,15 @@
 # Gail's Dataroom Assistant Writeup
 
-This project is a working AI dataroom assistant for GAIL'S LIMITED / Gail's Bakery, company number `06055393`. The goal is to support practical diligence questions over public filings and curated public context while avoiding the most common failure mode in financial RAG systems: plausible but unsupported numbers.
+This is a public-source AI dataroom assistant for GAIL'S LIMITED / Gail's Bakery, company number `06055393`. It is designed for diligence-style questions where the right behavior is often to refuse an unsupported answer, especially for exact financial figures.
 
-## Approach
+The system separates ingestion, retrieval, reviewed facts, and AI synthesis. Companies House profile, filing history, accounts metadata, charges, officers, PSC information, and curated public context are registered in `dataroom/manifest.json`. Processing writes page-level snippets or explicit processing-error records under `dataroom/processed/`. Structured facts live separately from text retrieval so financials, charges, ownership, and management questions can be handled deterministically before any model synthesis.
 
-The system separates exact facts from narrative synthesis. Companies House filings, charges, officers, PSC information, and curated news are registered in `dataroom/manifest.json` with stable source IDs, local paths, processing status, and inclusion rationale. The current manifest has 12 sources, with 9 indexed through processed snippets. The latest three Companies House parent consolidated accounts PDFs are downloaded but remain pending OCR/table extraction and human review. Structured facts such as revenue, EBITDA, debt, charges, directors, and ownership are stored separately from unstructured text so the assistant can answer deterministic questions without relying on model memory.
+Financial accuracy is gated. Candidate facts in `backend/data/financial_facts.json` are not answerable until a reviewer approves the metric, period, value, source, page, and quote by setting both `reviewed=true` and `usedInAnswers=true`. OpenAI is not trusted for exact revenue, EBITDA, debt, lenders, ownership, directors, or dates. EBITDA is answerable only if it is directly reviewed or computable from complete reviewed operating profit, depreciation, and amortisation facts for the same period.
 
-The FastAPI backend exposes `/health`, `/sources`, `/sources/{source_id}`, `/ask`, and eval endpoints. `/ask` classifies the question, routes financial/legal/ownership/management questions to structured data first, and uses retrieval plus optional server-side OpenAI synthesis for narrative questions. The Next.js frontend provides a chat interface, suggested diligence questions, loading/error states, and source cards so answers are inspectable.
+The current dataroom has `0` reviewed usable financial facts. The latest three parent accounts are registered, but account PDF processing currently records failures rather than usable reviewed values. As a result, revenue, EBITDA, debt, cash, and profit questions should return unavailable with missing-information detail. That is intentional: the app demonstrates safe unknown handling instead of plausible unsupported numbers.
 
-## Accuracy Decisions
+The answer flow is chatbot-first: browser UI to Netlify `/api/ask` or FastAPI `/ask`, question classification, structured facts for exact topics, manifest-backed retrieval for narrative questions, optional server-side OpenAI Responses API synthesis, verifier checks, then a cited answer or unavailable response. `OPENAI_API_KEY` is server-only and never exposed to frontend code.
 
-Financial figures are treated as evidence-backed facts, not generated prose. Revenue, EBITDA, and debt must come from structured records with period end, currency, unit, reported-or-computed status, formula where applicable, source ID, page/snippet evidence, extraction confidence, and review status. Exact financial answers pass the reviewed-facts gate only when `reviewed=true` and `usedInAnswers=true`; downloaded OCR output, parser candidates, placeholders, and unreviewed account values are blocked from final answers. EBITDA is reported if present; otherwise it is computed only when every formula component is reviewed and answer-approved. If the dataroom does not support an answer, the assistant should say so and list missing information.
+Local quality gates include backend pytest, ingestion/manifest checks, offline evals, frontend lint/build/smoke tests, raw-label scan, and secret scan through `python3 scripts/test_submission.py`. Production is checked with `scripts/verify_production.sh https://goldborne-gails-dataroom.netlify.app`, which verifies the page, API health, sources, cited supported answers, and unavailable responses for unsupported financial/private questions.
 
-The assistant also uses citation and verifier checks: substantive answers need source IDs from the manifest, numeric claims must be supported by structured facts or charge records, and narrative synthesis receives only retrieved evidence. This keeps the demo credible for lender-style questions where exactness matters.
-
-## Deployment
-
-The app can run as a root Netlify deployment using `netlify.toml`, bundled Netlify functions, and the Next.js frontend build from `frontend/`; alternatively, the backend can run on a Python host with `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`. The production mismatch came from Netlify serving an older frontend-oriented deployment instead of the root deployment with current functions and dataroom artifacts, which left the live UI on old copy and `0 indexed sources`. Production should be checked with `scripts/verify_production.sh`, which verifies the page plus `/api/sources` and requires at least 12 sources and 9 indexed sources. `OPENAI_API_KEY`, `OPENAI_MODEL`, and `USE_OPENAI_SYNTHESIS` are server-only variables for Netlify functions or the backend; the frontend only receives `NEXT_PUBLIC_API_BASE_URL` when it must call a separate backend.
-
-## Future Work
-
-- Better OCR and table extraction for Companies House PDFs.
-- A human review queue for extracted financial values before they become answerable facts.
-- Scheduled Companies House refresh with manifest diffs and stale-source alerts.
-- Full audit trail from source document to chunk, extraction, review, answer, and citation.
-- Authentication and access control for non-public demos or client-specific datarooms.
-- Expanded lender risk model covering covenants, liquidity, security package, operational risks, and store expansion sensitivity.
+Future work is focused on making the current honest gaps smaller: better OCR and table extraction for Companies House PDFs, a human review UI with audit trail, scheduled Companies House refreshes, broader public-source coverage, authentication for private datarooms, and richer credit analysis once covenant, liquidity, and facility-term sources are actually available.

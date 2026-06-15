@@ -1,6 +1,6 @@
 # Gail's Dataroom Source Notes
 
-Generated for GAIL'S LIMITED, company number 06055393. The current manifest registers 12 sources; 9 are indexed through processed snippets and 3 latest accounts PDFs are downloaded but pending OCR/table extraction and review.
+Generated for GAIL'S LIMITED, company number 06055393.
 
 ## Companies House coverage
 
@@ -10,7 +10,6 @@ Generated for GAIL'S LIMITED, company number 06055393. The current manifest regi
   - `ch-parent-accounts-2025`, period ending 2025-02-28, filed 2025-11-27
   - `ch-parent-accounts-2024`, period ending 2024-02-29, filed 2024-11-25
   - `ch-parent-accounts-2023`, period ending 2023-02-28, filed 2023-11-28
-- These three PDFs are present under `dataroom/raw/companies_house/` with `processing_status: downloaded` and `source_status: pending`; they still require OCR/table extraction and human source-page review before financial facts can be used in answers.
 - Charges register and outstanding charge instruments:
   - `ch-charges-register-06055393`
   - `ch-charge-0006`, outstanding, persons entitled Glas Trust Corporation Limited
@@ -38,4 +37,4 @@ The manifest intentionally uses placeholders for curated news because automated 
 
 ## Processing policy
 
-Keep `processing_status` as `pending_download` until the raw HTML/PDF is present at `local_path`. Move to `downloaded` when present, `processed` when text/chunks have been extracted into `dataroom/processed/`, and `verified` only after facts used for answers have been checked against the source page/PDF. `source_status` is the UI-friendly roll-up: `pending`, `processed`, or `verified`; downloaded but unprocessed files remain `pending`. Exact financial facts must stay out of answer generation unless both `reviewed=true` and `usedInAnswers=true` are set after review.
+Keep `processing_status` as `pending_download` until the raw HTML/PDF is present at `local_path`. Move to `downloaded` when present, `processed` when text/chunks have been extracted into `dataroom/processed/`, and `verified` only after facts used for answers have been checked against the source page/PDF. `source_status` is the UI-friendly roll-up: `pending`, `processed`, or `verified`; downloaded but unprocessed files remain `pending`.

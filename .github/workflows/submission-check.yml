@@ -1,0 +1,53 @@
+name: Submission Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  submission-check:
+    runs-on: ubuntu-latest
+    env:
+      USE_OPENAI_SYNTHESIS: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Backend pytest
+        run: python -m pytest backend/tests
+
+      - name: Frontend lint
+        run: npm --prefix frontend run lint
+
+      - name: Frontend build
+        run: npm --prefix frontend run build
+
+      - name: Frontend test
+        run: npm --prefix frontend run test
+
+      - name: Offline evals
+        run: python scripts/run_evals.py --responses backend/app/evals/sample_responses.json
+
+      - name: Manifest validation
+        run: python scripts/test_submission.py --check "manifest validation"
+
+      - name: Secret and raw-label scans
+        run: python scripts/test_submission.py --check "secret scan" --check "raw-label scan"

@@ -65,6 +65,16 @@ def test_ebitda_uses_reported_value_before_computed_components():
     assert ebitda.formula is None
 
 
+def test_ebitda_ignores_reviewed_reported_value_disabled_for_answers():
+    repository = FinancialFactsRepository()
+    repository.add_fact(fact("ebitda", "7500000", reviewed=True, used_in_answers=False))
+
+    ebitda = resolve_ebitda(repository, "2025-02-28")
+
+    assert ebitda.value is None
+    assert ebitda.reported_or_computed == "unavailable"
+
+
 def test_ebitda_computes_only_when_all_components_present():
     repository = FinancialFactsRepository()
     repository.add_fact(fact("operating_profit", "1000000"))
@@ -195,6 +205,19 @@ def test_repository_can_store_unusable_fact_without_answering_from_it():
     assert answer["answer_type"] == "unknown"
     assert answer["facts_used"] == []
     assert "reviewed usable financial_facts" in answer["missing_information"]
+
+
+def test_unsupported_financial_metric_returns_unknown_without_values():
+    repository = FinancialFactsRepository()
+    repository.add_fact(fact("revenue", "159432100.00"))
+
+    answer = build_financial_answer("What was gross margin?", repository)
+
+    assert answer["answer_type"] == "unknown"
+    assert answer["facts_used"] == []
+    assert answer["citations"] == []
+    assert answer["missing_information"] == ["supported financial metric"]
+    assert "£159,432,100.00" not in answer["answer"]
 
 
 def test_ebitda_does_not_compute_from_unreviewed_or_disabled_components():

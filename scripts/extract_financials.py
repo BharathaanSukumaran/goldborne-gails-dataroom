@@ -13,15 +13,19 @@ import argparse
 import csv
 import json
 import re
+import sys
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from backend.app.facts.models import FinancialFact, MoneyAmount
 from backend.app.facts.repository import FinancialFactsRepository
 
-ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "backend" / "data" / "financial_facts.json"
 TEXT_DIR = ROOT / "dataroom" / "processed" / "accounts_text"
 
@@ -36,8 +40,10 @@ METRIC_PATTERNS: dict[str, list[str]] = {
     "turnover": [r"\bturnover\b"],
     "operating_profit": [r"\boperating profit\b"],
     "profit_before_tax": [r"\bprofit before tax\b", r"\bprofit on ordinary activities before taxation\b"],
+    "profit_after_tax": [r"\bprofit for the financial year\b", r"\bprofit after tax\b", r"\bprofit for the year\b"],
     "cash": [r"\bcash at bank and in hand\b", r"\bcash and cash equivalents\b"],
     "borrowings": [r"\bborrowings\b", r"\bbank loans\b"],
+    "debt": [r"\bnet debt\b", r"\btotal debt\b", r"\bborrowings\b"],
     "net_assets": [r"\bnet assets\b"],
     "depreciation": [r"\bdepreciation\b"],
     "amortisation": [r"\bamortisation\b", r"\bamortization\b"],
@@ -49,6 +55,7 @@ REQUIRED_METRICS = [
     "ebitda",
     "operating_profit",
     "profit_before_tax",
+    "profit_after_tax",
     "cash",
     "borrowings",
     "debt",
@@ -191,12 +198,7 @@ def has_source_evidence(source_id: str, page: int | str | None, quote: str | Non
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--reviewed", action="store_true", help="Only for manually verified facts; normally leave false.")
-    parser.add_argument("--used-in-answers", action="store_true", help="Only allow with --reviewed after manual verification.")
     args = parser.parse_args()
-
-    if args.used_in_answers and not args.reviewed:
-        raise SystemExit("--used-in-answers requires --reviewed")
 
     facts: list[dict[str, Any]] = []
     for source_id, period_end, text_path in ACCOUNT_SOURCES:
@@ -205,29 +207,33 @@ def main() -> None:
         by_metric = {candidate.metric: candidate for candidate in candidates}
         for metric in REQUIRED_METRICS:
             candidate = by_metric.get(metric)
-            facts.append(to_fact(source_id, period_end, metric, candidate, reviewed=args.reviewed, used_in_answers=args.used_in_answers))
+            facts.append(to_fact(source_id, period_end, metric, candidate))
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({"facts": facts}, indent=2) + "\n", encoding="utf-8")
     extracted = sum(1 for fact in facts if fact["value"] is not None)
     print(f"Wrote {len(facts)} financial fact records to {args.output}")
     print(f"Extracted candidate values: {extracted}")
-    print("Reviewed usable facts: 0 unless --reviewed --used-in-answers was explicitly supplied")
+    print("Reviewed usable facts: 0. Parser output is never auto-approved; use review_financial_facts.py after human review.")
 
 
 def extract_candidates(text: str) -> list[Candidate]:
     if not meaningful_text(text):
         return []
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
     out: list[Candidate] = []
+    pages = text.split("\f") if "\f" in text else [text]
     for metric, patterns in METRIC_PATTERNS.items():
-        for line in lines:
-            normalized = re.sub(r"\s+", " ", line).strip()
-            if any(re.search(pattern, normalized, re.IGNORECASE) for pattern in patterns):
-                value = extract_first_money(normalized)
-                if value is not None:
-                    out.append(Candidate(metric=metric, value=value, quote=normalized[:260], page=None, confidence="0.4"))
-                    break
+        for page_number, page_text in enumerate(pages, start=1):
+            lines = [line.strip() for line in page_text.splitlines() if line.strip()]
+            for line in lines:
+                normalized = re.sub(r"\s+", " ", line).strip()
+                if any(re.search(pattern, normalized, re.IGNORECASE) for pattern in patterns):
+                    value = extract_first_money(normalized)
+                    if value is not None:
+                        out.append(Candidate(metric=metric, value=value, quote=normalized[:260], page=page_number, confidence="0.4"))
+                        break
+            if any(candidate.metric == metric for candidate in out):
+                break
     return out
 
 
@@ -244,7 +250,7 @@ def extract_first_money(line: str) -> str | None:
     return cleaned
 
 
-def to_fact(source_id: str, period_end: str, metric: str, candidate: Candidate | None, *, reviewed: bool, used_in_answers: bool) -> dict[str, Any]:
+def to_fact(source_id: str, period_end: str, metric: str, candidate: Candidate | None) -> dict[str, Any]:
     if metric == "ebitda" and candidate is None:
         quote = "EBITDA was not directly extracted. It may only be computed after operating profit, depreciation, and amortisation are reviewed and usable."
     elif candidate is None:
@@ -264,8 +270,8 @@ def to_fact(source_id: str, period_end: str, metric: str, candidate: Candidate |
         "page": candidate.page if candidate else None,
         "quote": quote,
         "extractionConfidence": candidate.confidence if candidate else "0",
-        "reviewed": reviewed and candidate is not None and has_source_evidence(source_id, candidate.page, quote),
-        "usedInAnswers": used_in_answers and reviewed and candidate is not None and has_source_evidence(source_id, candidate.page, quote),
+        "reviewed": False,
+        "usedInAnswers": False,
     }
 
 

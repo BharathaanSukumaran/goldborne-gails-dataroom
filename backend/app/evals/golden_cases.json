@@ -162,7 +162,7 @@
       }
     },
     {
-      "id": "charge_description_unavailable",
+      "id": "charge_description_reviewed_summary",
       "question": "What is the description of charge 0006?",
       "expect": {
         "answer_type_any_of": [
@@ -171,26 +171,27 @@
           "structured"
         ],
         "requires_citations": true,
-        "requires_missing_information": true,
         "must_contain": [
-          "reviewed charge description"
+          "No specific land, ship, aircraft or intellectual property",
+          "Contains fixed charge",
+          "Floating charge covers all the property or undertaking"
         ],
         "must_not_contain": [
-          "all assets",
-          "fixed charge",
-          "floating charge"
+          "0605 5393 0005"
         ],
         "charge_field": {
           "field_intent": "charge_description",
           "resolved_charge_code": "060553930006",
           "expected_source_id": "ch-charge-0006",
-          "requires_unavailable": true,
-          "forbid_generic_charge_list": true
+          "forbid_generic_charge_list": true,
+          "must_contain": [
+            "No specific land"
+          ]
         }
       }
     },
     {
-      "id": "secured_assets_unavailable",
+      "id": "secured_assets_reviewed_summary",
       "question": "What assets are secured by charge 0006?",
       "expect": {
         "answer_type_any_of": [
@@ -199,19 +200,22 @@
           "structured"
         ],
         "requires_citations": true,
-        "requires_missing_information": true,
         "must_not_contain": [
-          "all assets",
-          "fixed charge",
-          "floating charge"
+          "0605 5393 0005"
         ],
         "charge_field": {
           "field_intent": "secured_assets",
           "resolved_charge_code": "060553930006",
           "expected_source_id": "ch-charge-0006",
-          "requires_unavailable": true,
-          "forbid_generic_charge_list": true
-        }
+          "forbid_generic_charge_list": true,
+          "must_contain": [
+            "Floating charge covers all the property or undertaking"
+          ]
+        },
+        "must_contain": [
+          "No specific land, ship, aircraft or intellectual property",
+          "Floating charge covers all the property or undertaking"
+        ]
       }
     },
     {
@@ -286,6 +290,33 @@
           "resolved_charge_code": "060553930006",
           "expected_source_id": "ch-charge-0006",
           "requires_unavailable": true,
+          "forbid_generic_charge_list": true
+        }
+      }
+    },
+    {
+      "id": "what_is_charge_for_reviewed_summary",
+      "question": "What is charge 0006 for?",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "must_contain": [
+          "Floating charge covers all the property or undertaking"
+        ],
+        "must_not_contain": [
+          "0605 5393 0005"
+        ],
+        "charge_field": {
+          "field_intent": "charge_instrument_summary",
+          "resolved_charge_code": "060553930006",
+          "expected_source_id": "ch-charge-0006",
+          "must_contain": [
+            "Floating charge covers all the property or undertaking"
+          ],
           "forbid_generic_charge_list": true
         }
       }

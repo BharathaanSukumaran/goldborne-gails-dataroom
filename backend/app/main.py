@@ -208,6 +208,8 @@ def is_charge_question(q: str) -> bool:
         return True
     has_charge_field_intent = any(term in q for term in CHARGE_FIELD_TERMS)
     has_charge_reference = bool(_charge_reference_tokens(q))
+    if has_charge_reference and re.search(r"\bwhat\s+(?:is|was|are|were)?\s*(?:the\s+)?(?:specific\s+)?charge\b", q):
+        return True
     return has_charge_field_intent and has_charge_reference
 
 def _charge_reference_tokens(q: str) -> set[str]:
@@ -235,9 +237,9 @@ def _resolve_charge_rows(question: str, charges: list[dict]) -> list[dict]:
 def load_charge_facts() -> list[dict]:
     if CHARGE_FACTS_PATH.exists():
         payload = json.loads(CHARGE_FACTS_PATH.read_text(encoding="utf-8"))
-        facts = payload.get("charges", payload)
+        facts = payload.get("facts") or payload.get("charges") or payload
         if isinstance(facts, list):
-            return [fact for fact in facts if isinstance(fact, dict)]
+            return [normalize_charge_fact(fact) for fact in facts if isinstance(fact, dict)]
     return [
         {
             "workspaceId": "gails-limited",
@@ -257,6 +259,15 @@ def load_charge_facts() -> list[dict]:
     ]
 
 
+def normalize_charge_fact(fact: dict) -> dict:
+    normalized = dict(fact)
+    if not normalized.get("displayCode") and normalized.get("displayChargeCode"):
+        normalized["displayCode"] = normalized["displayChargeCode"]
+    if not normalized.get("shortCode") and normalized.get("chargeCode"):
+        normalized["shortCode"] = str(normalized["chargeCode"])[-4:]
+    return normalized
+
+
 def answer_charges(question: str = "") -> StructuredAnswer:
     facts = sorted(load_charge_facts(), key=lambda fact: str(fact.get("createdDate") or ""), reverse=True)
     if not facts:
@@ -265,9 +276,11 @@ def answer_charges(question: str = "") -> StructuredAnswer:
     charge = resolve_charge_reference(question, facts)
     if field_intent == "list_charges":
         return answer_charge_list(facts)
+    fact_key = CHARGE_FIELD_TO_FACT_KEY.get(field_intent)
+    if charge is None and fact_key and all(charge_field_is_reviewed(fact, fact_key) and fact.get(fact_key) not in (None, "") for fact in facts):
+        return answer_reviewed_charge_field_multiple(facts, field_intent, fact_key)
     if charge is None:
         return answer_missing_charge_reference(field_intent, facts)
-    fact_key = CHARGE_FIELD_TO_FACT_KEY.get(field_intent)
     if fact_key and charge_field_is_reviewed(charge, fact_key) and charge.get(fact_key) not in (None, ""):
         return answer_reviewed_charge_field(charge, field_intent, fact_key)
     return answer_unavailable_charge_field(charge, field_intent)
@@ -275,6 +288,10 @@ def answer_charges(question: str = "") -> StructuredAnswer:
 
 def detect_charge_field_intent(question: str) -> str:
     q = question.lower()
+    if re.search(r"\bwhat\s+(?:is|was|are|were)?\s*(?:the\s+)?(?:specific\s+)?charge\s+\d{4}\s+for\b", q):
+        return "charge_instrument_summary"
+    if re.search(r"\bwhat\s+(?:is|was)\s+(?:the\s+)?(?:specific\s+)?charge\s+for\b", q):
+        return "charge_instrument_summary"
     if any(term in q for term in ["what charges", "which charges", "registered charges", "list charges", "charges registered", "charges are registered", "lenders or charges"]):
         return "list_charges"
     if any(term in q for term in ["who holds", "holder", "held by", "person entitled", "persons entitled", "lender", "security trustee"]):
@@ -352,8 +369,31 @@ def answer_reviewed_charge_field(charge: dict, field_intent: str, fact_key: str)
     elif field_intent == "charge_created_date":
         answer = f"Charge {code} was created on {value}."
     else:
-        answer = f"The reviewed {CHARGE_FIELD_LABELS[field_intent]} for charge {code} is: {value}."
+        answer = f"The reviewed {CHARGE_FIELD_LABELS[field_intent]} for charge {code} is: {str(value).rstrip('.')}."
     return StructuredAnswer(answer=answer, answer_type="charges_security", facts_used=[charge_fact_payload(charge, field_intent, fact_key)], citations=[citation(src, str(charge.get("sourceQuote") or ""), charge.get("sourcePage"))], confidence="high", field_intent=field_intent, resolved_charge_code=str(charge.get("chargeCode") or ""))
+
+
+def answer_reviewed_charge_field_multiple(facts: list[dict], field_intent: str, fact_key: str) -> StructuredAnswer:
+    used: list[dict] = []
+    cites: list[Citation] = []
+    parts: list[str] = []
+    for fact in facts:
+        src = source_by_id(str(fact.get("sourceId")))
+        if src is None:
+            return unknown_answer([f"manifest source {fact.get('sourceId')}"], "I cannot answer charges because the supporting source is not in the manifest.")
+        code = fact.get("displayCode") or fact.get("chargeCode")
+        value = str(fact.get(fact_key) or "").rstrip(".")
+        parts.append(f"Charge {code}: {value}.")
+        used.append(charge_fact_payload(fact, field_intent, fact_key))
+        cites.append(citation(src, str(fact.get("sourceQuote") or ""), fact.get("sourcePage")))
+    return StructuredAnswer(
+        answer=f"Reviewed {CHARGE_FIELD_LABELS[field_intent]} for the matching charges: " + " ".join(parts),
+        answer_type="charges_security",
+        facts_used=used,
+        citations=cites,
+        confidence="high",
+        field_intent=field_intent,
+    )
 
 
 def answer_unavailable_charge_field(charge: dict, field_intent: str) -> StructuredAnswer:

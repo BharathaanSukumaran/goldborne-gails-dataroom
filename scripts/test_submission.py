@@ -60,11 +60,12 @@ VALID_SOURCE_STATUSES = {"pending", "processed", "verified"}
 REQUIRED_CHARGE_EVAL_CASE_IDS = {
     "charge_holder_0006",
     "charge_status_0005",
-    "charge_description_unavailable",
-    "secured_assets_unavailable",
+    "charge_description_reviewed_summary",
+    "secured_assets_reviewed_summary",
     "charge_created_date_0006",
     "charge_year_resolution_2021",
     "no_generic_answer_for_specific_charge_field",
+    "what_is_charge_for_reviewed_summary",
 }
 
 CHECK_COMMANDS: dict[str, list[str]] = {

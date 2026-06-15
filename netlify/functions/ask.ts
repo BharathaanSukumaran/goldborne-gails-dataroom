@@ -8,6 +8,7 @@ import {
   ownershipFacts,
   retrieveSourceChunks,
   sourceExists,
+  type ChargeFieldReview,
   type Citation,
   type SourceChunk
 } from "./_shared/data";
@@ -277,6 +278,7 @@ function structuredChargesAnswer(question: string): AskResponse {
   if (!facts.length) return unknown(["matching charge reference"], "I cannot resolve that charge reference from the dataroom.");
 
   if (fieldIntent === "list_charges") return answerChargeList(facts);
+  if (facts.length !== 1 && allChargesHaveReviewedField(facts, fieldIntent)) return answerChargeFieldList(facts, fieldIntent);
   if (facts.length !== 1) return answerMissingChargeReference(fieldIntent, facts);
 
   const charge = facts[0];
@@ -294,6 +296,8 @@ function structuredChargesAnswer(question: string): AskResponse {
 
 function detectChargeFieldIntent(question: string): string {
   const q = question.toLowerCase();
+  if (/\bwhat\s+(?:is|was|are|were)?\s*(?:the\s+)?(?:specific\s+)?charge\s+\d{4}\s+for\b/.test(q)) return "charge_instrument_summary";
+  if (/\bwhat\s+(?:is|was)\s+(?:the\s+)?(?:specific\s+)?charge\s+for\b/.test(q)) return "charge_instrument_summary";
   if (["what charges", "which charges", "registered charges", "list charges", "charges registered", "charges are registered", "lenders or charges"].some((term) => q.includes(term))) return "list_charges";
   if (["who holds", "holder", "held by", "person entitled", "persons entitled", "lender", "security trustee"].some((term) => q.includes(term))) return "charge_holder";
   if (["status", "outstanding", "satisfied"].some((term) => q.includes(term))) return "charge_status";
@@ -307,6 +311,41 @@ function detectChargeFieldIntent(question: string): string {
   if (["instrument", "debenture", "what does the charge say", "charge document"].some((term) => q.includes(term))) return "charge_instrument_summary";
   if (q.includes("description")) return "charge_description";
   return "list_charges";
+}
+
+function allChargesHaveReviewedField(facts: ChargeFact[], fieldIntent: string): boolean {
+  const key = chargeFactKey(fieldIntent);
+  return Boolean(key && facts.every((fact) => isReviewedChargeField(fact, key)));
+}
+
+function answerChargeFieldList(facts: ChargeFact[], fieldIntent: string): AskResponse {
+  const key = chargeFactKey(fieldIntent);
+  if (!key) return answerMissingChargeReference(fieldIntent, facts);
+  const label = CHARGE_FIELD_LABELS[fieldIntent] || "requested charge field";
+  return makeResponse({
+    answer: `Reviewed ${label} for the matching charges: ` + facts.map((fact) => `Charge ${fact.chargeCode}: ${String(fact[key] || "").replace(/\.$/, "")}.`).join(" "),
+    answerType: "charges_security",
+    factsUsed: facts.map((fact) => chargeFactPayload(fact, fieldIntent)),
+    citations: dedupeCitations(facts.map((fact) => citation(fact.sourceId, fact.sourceQuote, null))),
+    missingInformation: [],
+    confidence: "high",
+    fieldIntent
+  });
+}
+
+function chargeFactKey(fieldIntent: string): keyof ChargeFact | null {
+  const map: Record<string, keyof ChargeFact> = {
+    charge_description: "description",
+    charge_short_particulars: "shortParticulars",
+    secured_assets: "securedAssets",
+    security_type: "securityType",
+    charge_instrument_summary: "instrumentSummary"
+  };
+  return map[fieldIntent] || null;
+}
+
+function isReviewedChargeField(fact: ChargeFact, key: keyof ChargeFact): boolean {
+  return Boolean(fact.reviewed && fact.fieldReview[key as keyof ChargeFieldReview] && fact[key]);
 }
 
 function answerChargeList(facts: ChargeFact[]): AskResponse {

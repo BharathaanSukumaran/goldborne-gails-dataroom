@@ -20,6 +20,7 @@ ask_charge_status_json="$tmp_dir/ask_charge_status.json"
 ask_charge_created_json="$tmp_dir/ask_charge_created.json"
 ask_charge_description_json="$tmp_dir/ask_charge_description.json"
 ask_charge_assets_json="$tmp_dir/ask_charge_assets.json"
+ask_charge_for_json="$tmp_dir/ask_charge_for.json"
 bundle_urls="$tmp_dir/bundle_urls.txt"
 bundle_js="$tmp_dir/frontend_bundle.js"
 
@@ -72,6 +73,11 @@ curl -fsSL "$BASE_URL/api/ask" \
   -d '{"workspaceId":"gails-limited","question":"What assets are secured by charge 0006?"}' \
   -o "$ask_charge_assets_json"
 
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"What is charge 0006 for?"}' \
+  -o "$ask_charge_for_json"
+
 missing_status="$(curl -sS -L -w "%{http_code}" "$BASE_URL/api/ask" \
   -H "Content-Type: application/json" \
   -d '{}' \
@@ -82,7 +88,7 @@ empty_status="$(curl -sS -L -w "%{http_code}" "$BASE_URL/api/ask" \
   -d '{"workspaceId":"gails-limited","question":""}' \
   -o "$ask_empty_json")"
 
-node - "$page_html" "$health_json" "$sources_json" "$ask_credit_json" "$ask_financial_json" "$ask_unsupported_json" "$ask_charge_holder_json" "$ask_charge_status_json" "$ask_charge_created_json" "$ask_charge_description_json" "$ask_charge_assets_json" "$missing_status" "$empty_status" "$ask_missing_json" "$ask_empty_json" <<'NODE'
+node - "$page_html" "$health_json" "$sources_json" "$ask_credit_json" "$ask_financial_json" "$ask_unsupported_json" "$ask_charge_holder_json" "$ask_charge_status_json" "$ask_charge_created_json" "$ask_charge_description_json" "$ask_charge_assets_json" "$ask_charge_for_json" "$missing_status" "$empty_status" "$ask_missing_json" "$ask_empty_json" <<'NODE'
 const fs = require("node:fs");
 const [
   pagePath,
@@ -96,6 +102,7 @@ const [
   askChargeCreatedPath,
   askChargeDescriptionPath,
   askChargeAssetsPath,
+  askChargeForPath,
   missingStatus,
   emptyStatus,
   askMissingPath,
@@ -112,6 +119,7 @@ const askChargeStatus = JSON.parse(fs.readFileSync(askChargeStatusPath, "utf8"))
 const askChargeCreated = JSON.parse(fs.readFileSync(askChargeCreatedPath, "utf8"));
 const askChargeDescription = JSON.parse(fs.readFileSync(askChargeDescriptionPath, "utf8"));
 const askChargeAssets = JSON.parse(fs.readFileSync(askChargeAssetsPath, "utf8"));
+const askChargeFor = JSON.parse(fs.readFileSync(askChargeForPath, "utf8"));
 const askMissingBody = fs.readFileSync(askMissingPath, "utf8");
 const askEmptyBody = fs.readFileSync(askEmptyPath, "utf8");
 
@@ -166,8 +174,9 @@ function assertChargeResponse(label, response, { intent, code, answerPattern, un
 assertChargeResponse("charge holder", askChargeHolder, { intent: "charge_holder", code: "060553930006", answerPattern: /Glas Trust Corporation Limited/i });
 assertChargeResponse("charge status", askChargeStatus, { intent: "charge_status", code: "060553930005", answerPattern: /outstanding/i });
 assertChargeResponse("charge created date", askChargeCreated, { intent: "charge_created_date", code: "060553930006", answerPattern: /2022-06-06|6 June 2022/i });
-assertChargeResponse("charge description", askChargeDescription, { intent: "charge_description", code: "060553930006", answerPattern: /not available|cannot answer|unavailable|does not contain/i, unavailable: true });
-assertChargeResponse("charge secured assets", askChargeAssets, { intent: "secured_assets", code: "060553930006", answerPattern: /not available|cannot answer|unavailable|does not contain/i, unavailable: true });
+assertChargeResponse("charge description", askChargeDescription, { intent: "charge_description", code: "060553930006", answerPattern: /No specific land, ship, aircraft or intellectual property|Contains fixed charge|Floating charge covers all the property or undertaking/i });
+assertChargeResponse("charge secured assets", askChargeAssets, { intent: "secured_assets", code: "060553930006", answerPattern: /No specific land, ship, aircraft or intellectual property|Floating charge covers all the property or undertaking/i });
+assertChargeResponse("charge purpose", askChargeFor, { intent: "charge_instrument_summary", code: "060553930006", answerPattern: /Floating charge covers all the property or undertaking/i });
 
 for (const [label, status, body] of [
   ["missing query", missingStatus, askMissingBody],
@@ -186,7 +195,7 @@ console.log(`Production API: ${sources.length} sources, ${indexed} indexed`);
 console.log(`Ask credit: ${creditCitations.length} citations, confidence=${askCredit.confidence || "n/a"}`);
 console.log(`Ask financial: type=${financialType}, missing=${Array.isArray(financialMissing) ? financialMissing.join(",") : "n/a"}`);
 console.log(`Ask unsupported: type=${unsupportedType}, missing=${Array.isArray(unsupportedMissing) ? unsupportedMissing.join(",") : "n/a"}`);
-console.log(`Ask charges: holder=${askChargeHolder.field_intent || askChargeHolder.fieldIntent}, status=${askChargeStatus.field_intent || askChargeStatus.fieldIntent}, unavailable=${askChargeDescription.field_intent || askChargeDescription.fieldIntent}/${askChargeAssets.field_intent || askChargeAssets.fieldIntent}`);
+console.log(`Ask charges: holder=${askChargeHolder.field_intent || askChargeHolder.fieldIntent}, status=${askChargeStatus.field_intent || askChargeStatus.fieldIntent}, summary=${askChargeDescription.field_intent || askChargeDescription.fieldIntent}/${askChargeAssets.field_intent || askChargeAssets.fieldIntent}/${askChargeFor.field_intent || askChargeFor.fieldIntent}`);
 console.log(`Ask validation errors: missing=${missingStatus}, empty=${emptyStatus}`);
 
 if (failures.length) {

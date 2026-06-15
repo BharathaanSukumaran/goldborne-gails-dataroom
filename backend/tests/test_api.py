@@ -185,26 +185,28 @@ def test_charge_status_0005_specific_field_answer():
     assert body["citations"]
 
 
-def test_charge_description_0006_unavailable_not_generic_list():
+def test_charge_description_0006_answers_reviewed_brief_description():
     response = client.post("/ask", json={"question": "What is the description of charge 0006?"})
     body = response.json()
     assert response.status_code == 200
     assert body["field_intent"] == "charge_description"
     assert body["resolved_charge_code"] == "060553930006"
-    assert "does not contain a reviewed charge description" in body["answer"].lower()
+    assert "no specific land, ship, aircraft or intellectual property" in body["answer"].lower()
+    assert "contains fixed charge" in body["answer"].lower()
+    assert "floating charge covers all the property or undertaking" in body["answer"].lower()
     assert "charge 0605 5393 0005" not in body["answer"]
-    assert "Glas Trust Corporation Limited" in body["answer"]
-    assert body["missing_information"]
+    assert body["missing_information"] == []
 
 
-def test_charge_assets_0006_unavailable_not_invented():
+def test_charge_assets_0006_answers_reviewed_companies_house_summary():
     response = client.post("/ask", json={"question": "What assets are secured by charge 0006?"})
     body = response.json()
     assert response.status_code == 200
     assert body["field_intent"] == "secured_assets"
-    assert "does not contain a reviewed secured assets" in body["answer"].lower()
-    assert "all assets" not in body["answer"].lower()
-    assert body["missing_information"]
+    assert body["resolved_charge_code"] == "060553930006"
+    assert "no specific land, ship, aircraft or intellectual property" in body["answer"].lower()
+    assert "floating charge covers all the property or undertaking" in body["answer"].lower()
+    assert body["missing_information"] == []
 
 
 def test_charge_description_resolves_2021_and_2022_charge_years():
@@ -214,15 +216,26 @@ def test_charge_description_resolves_2021_and_2022_charge_years():
     body_2022 = response_2022.json()
     assert body_2021["resolved_charge_code"] == "060553930005"
     assert body_2022["resolved_charge_code"] == "060553930006"
-    assert "does not contain a reviewed charge description" in body_2021["answer"].lower()
-    assert "does not contain a reviewed charge description" in body_2022["answer"].lower()
+    assert "no specific land, ship, aircraft or intellectual property" in body_2021["answer"].lower()
+    assert "no specific land, ship, aircraft or intellectual property" in body_2022["answer"].lower()
 
 
-def test_charge_instrument_all_assets_unavailable():
+def test_charge_instrument_all_assets_answers_reviewed_summary():
     response = client.post("/ask", json={"question": "What does the charge instrument say about all assets?"})
     body = response.json()
     assert response.status_code == 200
     assert body["answer_type"] == "charges_security"
     assert body["field_intent"] in {"secured_assets", "charge_instrument_summary"}
-    assert "does not contain" in body["answer"].lower()
-    assert body["missing_information"]
+    assert "floating charge covers all the property or undertaking" in body["answer"].lower()
+    assert body["missing_information"] == []
+
+
+def test_what_is_charge_0006_for_routes_to_security_summary():
+    response = client.post("/ask", json={"question": "What is charge 0006 for?"})
+    body = response.json()
+    assert response.status_code == 200
+    assert body["answer_type"] == "charges_security"
+    assert body["field_intent"] == "charge_instrument_summary"
+    assert body["resolved_charge_code"] == "060553930006"
+    assert "floating charge covers all the property or undertaking" in body["answer"].lower()
+    assert "Glas Trust Corporation Limited" not in body["answer"]

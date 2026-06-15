@@ -112,10 +112,10 @@ def test_charge_facts_json_has_field_level_review_gates() -> None:
     charge_0006 = next(fact for fact in facts if fact.short_code == "0006")
     assert charge_0006.reviewed_value("holder") == ("Glas Trust Corporation Limited",)
     assert charge_0006.reviewed_value("createdDate") == "2022-06-06"
-    assert charge_0006.reviewed_value("description") is None
-    assert charge_0006.reviewed_value("securedAssets") is None
-    assert charge_0006.field_review["description"] is False
-    assert charge_0006.field_review["securedAssets"] is False
+    assert "No specific land, ship, aircraft or intellectual property" in charge_0006.reviewed_value("description")
+    assert "floating charge covers all the property or undertaking" in charge_0006.reviewed_value("securedAssets")
+    assert charge_0006.field_review["description"] is True
+    assert charge_0006.field_review["securedAssets"] is True
 
 
 def test_current_directors_filters_resigned_officers_and_cites_sources() -> None:

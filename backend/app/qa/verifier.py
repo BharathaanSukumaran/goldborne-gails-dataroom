@@ -467,6 +467,12 @@ def _supported_charge_field_text(
             str(value or "")
             for value in (
                 _field(charge, "description"),
+                _field(charge, "shortParticulars"),
+                _field(charge, "securedAssets"),
+                _field(charge, "securityType"),
+                _field(charge, "instrumentSummary"),
+                _field(charge, "sourceQuote"),
+                _field(charge, "requestedField"),
                 _field(charge, "classification"),
                 _field(charge, "assets"),
                 _field(charge, "asset_description"),

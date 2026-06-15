@@ -67,6 +67,10 @@ REQUIRED_CHARGE_EVAL_CASE_IDS = {
     "no_generic_answer_for_specific_charge_field",
     "what_is_charge_for_reviewed_summary",
     "bare_brief_description_reviewed_summary",
+    "document_status_field_answer",
+    "filing_history_field_answer",
+    "latest_accounts_metadata_answer",
+    "company_number_field_answer",
 }
 
 CHECK_COMMANDS: dict[str, list[str]] = {

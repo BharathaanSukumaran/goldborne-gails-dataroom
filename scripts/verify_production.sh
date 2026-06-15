@@ -22,6 +22,10 @@ ask_charge_description_json="$tmp_dir/ask_charge_description.json"
 ask_charge_assets_json="$tmp_dir/ask_charge_assets.json"
 ask_charge_for_json="$tmp_dir/ask_charge_for.json"
 ask_brief_description_json="$tmp_dir/ask_brief_description.json"
+ask_company_number_json="$tmp_dir/ask_company_number.json"
+ask_latest_accounts_json="$tmp_dir/ask_latest_accounts.json"
+ask_filing_history_json="$tmp_dir/ask_filing_history.json"
+ask_document_status_json="$tmp_dir/ask_document_status.json"
 bundle_urls="$tmp_dir/bundle_urls.txt"
 bundle_js="$tmp_dir/frontend_bundle.js"
 
@@ -84,6 +88,26 @@ curl -fsSL "$BASE_URL/api/ask" \
   -d '{"workspaceId":"gails-limited","question":"Brief description"}' \
   -o "$ask_brief_description_json"
 
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"Company number"}' \
+  -o "$ask_company_number_json"
+
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"Latest accounts"}' \
+  -o "$ask_latest_accounts_json"
+
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"Filing history"}' \
+  -o "$ask_filing_history_json"
+
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"Document status"}' \
+  -o "$ask_document_status_json"
+
 missing_status="$(curl -sS -L -w "%{http_code}" "$BASE_URL/api/ask" \
   -H "Content-Type: application/json" \
   -d '{}' \
@@ -94,7 +118,7 @@ empty_status="$(curl -sS -L -w "%{http_code}" "$BASE_URL/api/ask" \
   -d '{"workspaceId":"gails-limited","question":""}' \
   -o "$ask_empty_json")"
 
-node - "$page_html" "$health_json" "$sources_json" "$ask_credit_json" "$ask_financial_json" "$ask_unsupported_json" "$ask_charge_holder_json" "$ask_charge_status_json" "$ask_charge_created_json" "$ask_charge_description_json" "$ask_charge_assets_json" "$ask_charge_for_json" "$ask_brief_description_json" "$missing_status" "$empty_status" "$ask_missing_json" "$ask_empty_json" <<'NODE'
+node - "$page_html" "$health_json" "$sources_json" "$ask_credit_json" "$ask_financial_json" "$ask_unsupported_json" "$ask_charge_holder_json" "$ask_charge_status_json" "$ask_charge_created_json" "$ask_charge_description_json" "$ask_charge_assets_json" "$ask_charge_for_json" "$ask_brief_description_json" "$ask_company_number_json" "$ask_latest_accounts_json" "$ask_filing_history_json" "$ask_document_status_json" "$missing_status" "$empty_status" "$ask_missing_json" "$ask_empty_json" <<'NODE'
 const fs = require("node:fs");
 const [
   pagePath,
@@ -110,6 +134,10 @@ const [
   askChargeAssetsPath,
   askChargeForPath,
   askBriefDescriptionPath,
+  askCompanyNumberPath,
+  askLatestAccountsPath,
+  askFilingHistoryPath,
+  askDocumentStatusPath,
   missingStatus,
   emptyStatus,
   askMissingPath,
@@ -128,6 +156,10 @@ const askChargeDescription = JSON.parse(fs.readFileSync(askChargeDescriptionPath
 const askChargeAssets = JSON.parse(fs.readFileSync(askChargeAssetsPath, "utf8"));
 const askChargeFor = JSON.parse(fs.readFileSync(askChargeForPath, "utf8"));
 const askBriefDescription = JSON.parse(fs.readFileSync(askBriefDescriptionPath, "utf8"));
+const askCompanyNumber = JSON.parse(fs.readFileSync(askCompanyNumberPath, "utf8"));
+const askLatestAccounts = JSON.parse(fs.readFileSync(askLatestAccountsPath, "utf8"));
+const askFilingHistory = JSON.parse(fs.readFileSync(askFilingHistoryPath, "utf8"));
+const askDocumentStatus = JSON.parse(fs.readFileSync(askDocumentStatusPath, "utf8"));
 const askMissingBody = fs.readFileSync(askMissingPath, "utf8");
 const askEmptyBody = fs.readFileSync(askEmptyPath, "utf8");
 
@@ -187,6 +219,20 @@ assertChargeResponse("charge secured assets", askChargeAssets, { intent: "secure
 assertChargeResponse("charge purpose", askChargeFor, { intent: "charge_instrument_summary", code: "060553930006", answerPattern: /Floating charge covers all the property or undertaking/i });
 assertChargeResponse("brief description", askBriefDescription, { intent: "charge_description", answerPattern: /No specific land, ship, aircraft or intellectual property/i });
 
+function assertSourceLookup(label, response, { intent, answerPattern }) {
+  const answer = String(response.answer || "");
+  const citations = Array.isArray(response.citations) ? response.citations : [];
+  if ((response.answer_type || response.answerType) !== "source_lookup") failures.push(`${label} should be source_lookup`);
+  if (response.field_intent !== intent && response.fieldIntent !== intent) failures.push(`${label} field intent mismatch`);
+  if (!answerPattern.test(answer)) failures.push(`${label} answer did not match expected reviewed metadata`);
+  if (!citations.length) failures.push(`${label} response has no citations`);
+}
+
+assertSourceLookup("company number", askCompanyNumber, { intent: "company_number", answerPattern: /06055393/ });
+assertSourceLookup("latest accounts", askLatestAccounts, { intent: "latest_accounts", answerPattern: /2025|processing/i });
+assertSourceLookup("filing history", askFilingHistory, { intent: "filing_history", answerPattern: /parent consolidated accounts/i });
+assertSourceLookup("document status", askDocumentStatus, { intent: "document_status", answerPattern: /processed sources|sources needing processing/i });
+
 for (const [label, status, body] of [
   ["missing query", missingStatus, askMissingBody],
   ["empty query", emptyStatus, askEmptyBody],
@@ -205,6 +251,7 @@ console.log(`Ask credit: ${creditCitations.length} citations, confidence=${askCr
 console.log(`Ask financial: type=${financialType}, missing=${Array.isArray(financialMissing) ? financialMissing.join(",") : "n/a"}`);
 console.log(`Ask unsupported: type=${unsupportedType}, missing=${Array.isArray(unsupportedMissing) ? unsupportedMissing.join(",") : "n/a"}`);
 console.log(`Ask charges: holder=${askChargeHolder.field_intent || askChargeHolder.fieldIntent}, status=${askChargeStatus.field_intent || askChargeStatus.fieldIntent}, summary=${askChargeDescription.field_intent || askChargeDescription.fieldIntent}/${askChargeAssets.field_intent || askChargeAssets.fieldIntent}/${askChargeFor.field_intent || askChargeFor.fieldIntent}/${askBriefDescription.field_intent || askBriefDescription.fieldIntent}`);
+console.log(`Ask document fields: company=${askCompanyNumber.field_intent || askCompanyNumber.fieldIntent}, accounts=${askLatestAccounts.field_intent || askLatestAccounts.fieldIntent}, filing=${askFilingHistory.field_intent || askFilingHistory.fieldIntent}, status=${askDocumentStatus.field_intent || askDocumentStatus.fieldIntent}`);
 console.log(`Ask validation errors: missing=${missingStatus}, empty=${emptyStatus}`);
 
 if (failures.length) {

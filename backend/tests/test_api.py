@@ -23,6 +23,48 @@ def test_sources_and_source_detail():
     assert "2025" in detail.json()["title"]
 
 
+def test_company_number_bare_field_answer():
+    response = client.post("/ask", json={"question": "Company number"})
+    body = response.json()
+    assert response.status_code == 200
+    assert body["answer_type"] == "source_lookup"
+    assert body["field_intent"] == "company_number"
+    assert "06055393" in body["answer"]
+    assert body["citations"][0]["source_id"] == "ch-profile-06055393"
+
+
+def test_latest_accounts_metadata_answer_without_inventing_financials():
+    response = client.post("/ask", json={"question": "Latest accounts"})
+    body = response.json()
+    assert response.status_code == 200
+    assert body["answer_type"] == "source_lookup"
+    assert body["field_intent"] == "latest_accounts"
+    assert "28 February 2025" in body["answer"] or "2025-02-28" in body["answer"]
+    assert "processing" in body["answer"].lower()
+    assert body["missing_information"]
+    assert body["citations"][0]["source_id"] == "ch-parent-accounts-2025"
+
+
+def test_filing_history_field_answer():
+    response = client.post("/ask", json={"question": "Filing history"})
+    body = response.json()
+    assert response.status_code == 200
+    assert body["answer_type"] == "source_lookup"
+    assert body["field_intent"] == "filing_history"
+    assert "parent consolidated accounts" in body["answer"].lower()
+    assert body["citations"][0]["source_id"] == "ch-filing-history-06055393"
+
+
+def test_document_processing_status_field_answer():
+    response = client.post("/ask", json={"question": "Document status"})
+    body = response.json()
+    assert response.status_code == 200
+    assert body["answer_type"] == "source_lookup"
+    assert body["field_intent"] == "document_status"
+    assert "processed sources" in body["answer"]
+    assert "sources needing processing" in body["answer"]
+
+
 def test_ask_financial_unknown_until_reviewed_source_pdf():
     response = client.post("/ask", json={"question": "What was revenue and EBITDA in the last reported year?"})
     body = response.json()

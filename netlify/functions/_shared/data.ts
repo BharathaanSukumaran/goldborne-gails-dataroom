@@ -25,6 +25,11 @@ export type ManifestSource = {
   status?: string;
   notes?: string | null;
   pages?: number | null;
+  expected_file?: string | null;
+  filing_type?: string | null;
+  filed_at?: string | null;
+  period_end?: string | null;
+  page_count?: number | null;
 };
 
 export type DataroomManifest = {
@@ -298,6 +303,7 @@ export function loadManifest(): DataroomManifest {
 
 
 export const manifest = loadManifest();
+export const company = manifest.company;
 export const sources = manifest.sources;
 export const sourceCategories = Array.from(new Set(sources.map((source) => source.category))).sort();
 export const indexedSourceCount = sources.filter((source) => source.indexed).length;

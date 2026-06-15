@@ -345,6 +345,70 @@
           "forbid_generic_charge_list": true
         }
       }
+    },
+    {
+      "id": "company_number_field_answer",
+      "question": "Company number",
+      "expect": {
+        "answer_type_any_of": [
+          "source_lookup",
+          "structured"
+        ],
+        "requires_citations": true,
+        "must_contain": [
+          "06055393"
+        ]
+      }
+    },
+    {
+      "id": "latest_accounts_metadata_answer",
+      "question": "Latest accounts",
+      "expect": {
+        "answer_type_any_of": [
+          "source_lookup",
+          "structured"
+        ],
+        "requires_citations": true,
+        "requires_missing_information": true,
+        "must_contain": [
+          "2025",
+          "processing"
+        ],
+        "must_not_contain": [
+          "\u00a3",
+          "GBP 1",
+          "EBITDA was"
+        ]
+      }
+    },
+    {
+      "id": "filing_history_field_answer",
+      "question": "Filing history",
+      "expect": {
+        "answer_type_any_of": [
+          "source_lookup",
+          "structured"
+        ],
+        "requires_citations": true,
+        "must_contain": [
+          "parent consolidated accounts"
+        ]
+      }
+    },
+    {
+      "id": "document_status_field_answer",
+      "question": "Document status",
+      "expect": {
+        "answer_type_any_of": [
+          "source_lookup",
+          "structured"
+        ],
+        "requires_citations": true,
+        "must_contain": [
+          "processed sources",
+          "sources needing processing"
+        ]
+      }
     }
   ]
 }

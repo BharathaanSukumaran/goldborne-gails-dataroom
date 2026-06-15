@@ -300,5 +300,91 @@
     ],
     "missing_information": [],
     "confidence": "high"
+  },
+  "company_number_field_answer": {
+    "answer": "The reviewed company number is 06055393.",
+    "answer_type": "source_lookup",
+    "field_intent": "company_number",
+    "facts_used": [
+      {
+        "fieldIntent": "company_number",
+        "value": "06055393",
+        "sourceId": "ch-profile-06055393"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-profile-06055393",
+        "title": "Companies House company overview for GAIL'S LIMITED",
+        "snippet": "Company number: 06055393."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "high"
+  },
+  "latest_accounts_metadata_answer": {
+    "answer": "The latest accounts source in the dataroom is Parent consolidated accounts, period ending 28 February 2025 with period end 2025-02-28 and filing type PARENT_ACC. Processing status is processing_failed; exact financial values remain unavailable until the PDF is processed and reviewed.",
+    "answer_type": "source_lookup",
+    "field_intent": "latest_accounts",
+    "facts_used": [
+      {
+        "fieldIntent": "latest_accounts",
+        "sourceId": "ch-parent-accounts-2025"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-parent-accounts-2025",
+        "title": "Parent consolidated accounts, period ending 28 February 2025",
+        "snippet": "Most recent parent consolidated accounts needed for exact revenue, EBITDA, debt, ownership context, and credit analysis."
+      }
+    ],
+    "missing_information": [
+      "reviewed financial values"
+    ],
+    "confidence": "high"
+  },
+  "filing_history_field_answer": {
+    "answer": "Companies House filing history identifies the latest three parent consolidated accounts for periods ending 28 February 2025, 29 February 2024 and 28 February 2023, plus recent officer and charge filings.",
+    "answer_type": "source_lookup",
+    "field_intent": "filing_history",
+    "facts_used": [
+      {
+        "fieldIntent": "filing_history",
+        "sourceId": "ch-filing-history-06055393"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-filing-history-06055393",
+        "title": "Companies House filing history for GAIL'S LIMITED",
+        "snippet": "Latest three parent consolidated accounts are listed."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "high"
+  },
+  "document_status_field_answer": {
+    "answer": "The dataroom has 9 processed sources and 3 sources needing processing or review.",
+    "answer_type": "source_lookup",
+    "field_intent": "document_status",
+    "facts_used": [
+      {
+        "fieldIntent": "document_status",
+        "processed": 9,
+        "failed": 3
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-profile-06055393",
+        "title": "Companies House company overview for GAIL'S LIMITED",
+        "snippet": "Baseline legal identity source."
+      }
+    ],
+    "missing_information": [
+      "processing/review for pending sources"
+    ],
+    "confidence": "high"
   }
 }

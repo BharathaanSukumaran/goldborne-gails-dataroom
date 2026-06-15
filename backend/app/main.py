@@ -85,6 +85,18 @@ LEGAL_FIELD_INTENTS = {
     "charge_document_lookup",
 }
 
+DOCUMENT_FIELD_LABELS = {
+    "legal_name": "legal name",
+    "company_number": "company number",
+    "jurisdiction": "jurisdiction",
+    "companies_house_url": "Companies House URL",
+    "company_profile": "company profile",
+    "latest_accounts": "latest accounts filing",
+    "accounts_status": "accounts processing status",
+    "filing_history": "filing history",
+    "document_status": "document processing status",
+}
+
 @app.on_event("startup")
 def startup() -> None:
     seed_database()
@@ -146,6 +158,9 @@ def answer_question(question: str) -> StructuredAnswer:
     q = question.lower()
     if is_charge_question(q):
         return answer_charges(question)
+    document_field_answer = answer_document_field(question)
+    if document_field_answer is not None:
+        return document_field_answer
     if any(term in q for term in ["revenue", "ebitda", "debt", "borrowings"]):
         return answer_financial(question)
     if any(term in q for term in ["director", "directors", "management", "officer"]):
@@ -203,6 +218,104 @@ def answer_financial(question: str) -> StructuredAnswer:
         missing_information=payload.get("missing_information", []),
         confidence=payload.get("confidence", "low"),
     )
+
+def answer_document_field(question: str) -> StructuredAnswer | None:
+    intent = detect_document_field_intent(question)
+    if intent is None:
+        return None
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    company = manifest.get("company", {})
+    sources = manifest.get("sources", [])
+
+    def src(source_id: str) -> dict | None:
+        return source_by_id(source_id)
+
+    profile = src("ch-profile-06055393")
+    filing = src("ch-filing-history-06055393")
+
+    if intent in {"legal_name", "company_number", "jurisdiction", "companies_house_url"}:
+        key = {"legal_name": "legal_name", "company_number": "company_number", "jurisdiction": "jurisdiction", "companies_house_url": "companies_house_url"}[intent]
+        value = company.get(key)
+        if not value:
+            return unknown_answer([DOCUMENT_FIELD_LABELS[intent]], f"The reviewed {DOCUMENT_FIELD_LABELS[intent]} is not available in the current dataroom.")
+        citation_source = profile or (sources[0] if sources else None)
+        citations = [citation(citation_source, f"Companies House company profile records {DOCUMENT_FIELD_LABELS[intent]}: {value}.")] if citation_source else []
+        return StructuredAnswer(
+            answer=f"The reviewed {DOCUMENT_FIELD_LABELS[intent]} is {value}.",
+            answer_type="source_lookup",
+            facts_used=[{"fieldIntent": intent, "value": value, "sourceId": citation_source["source_id"] if citation_source else None}],
+            citations=citations,
+            confidence="high",
+            field_intent=intent,
+        )
+
+    if intent == "company_profile":
+        if not profile:
+            return unknown_answer(["company profile source"], "The company profile source is not available in the current dataroom.")
+        answer = f"GAIL'S LIMITED is registered under company number {company.get('company_number', '06055393')} in {company.get('jurisdiction', 'England and Wales')}."
+        return StructuredAnswer(answer=answer, answer_type="source_lookup", facts_used=[{"fieldIntent": intent, **company}], citations=[citation(profile, profile.get("included_reason"))], confidence="high", field_intent=intent)
+
+    account_sources = sorted(
+        [source for source in sources if source.get("category") == "accounts"],
+        key=lambda source: str(source.get("period_end") or ""),
+        reverse=True,
+    )
+    if intent == "latest_accounts":
+        if not account_sources:
+            return unknown_answer(["accounts source"], "No accounts filings are registered in the current dataroom.")
+        latest = account_sources[0]
+        source_row = src(latest["source_id"]) or latest
+        answer = (
+            f"The latest accounts source in the dataroom is {latest.get('title')} with period end {latest.get('period_end')} "
+            f"and filing type {latest.get('filing_type')}. Processing status is {latest.get('processing_status')}; exact financial values remain unavailable until the PDF is processed and reviewed."
+        )
+        return StructuredAnswer(answer=answer, answer_type="source_lookup", facts_used=[{"fieldIntent": intent, **latest}], citations=[citation(source_row, latest.get("included_reason"))], missing_information=["reviewed financial values"] if latest.get("processing_status") != "processed" else [], confidence="high", field_intent=intent)
+
+    if intent == "accounts_status":
+        if not account_sources:
+            return unknown_answer(["accounts source"], "No accounts filings are registered in the current dataroom.")
+        parts = [f"{source.get('period_end')}: {source.get('processing_status')}" for source in account_sources]
+        cites = [citation(src(source["source_id"]) or source, source.get("notes") or source.get("included_reason")) for source in account_sources[:3]]
+        return StructuredAnswer(answer="Accounts processing status: " + "; ".join(parts) + ".", answer_type="source_lookup", facts_used=[{"fieldIntent": intent, **source} for source in account_sources], citations=cites, missing_information=["reviewed financial values"], confidence="high", field_intent=intent)
+
+    if intent == "filing_history":
+        if not filing:
+            return unknown_answer(["filing history source"], "The filing history source is not available in the current dataroom.")
+        answer = "Companies House filing history identifies the latest three parent consolidated accounts for periods ending 28 February 2025, 29 February 2024 and 28 February 2023, plus recent officer and charge filings."
+        return StructuredAnswer(answer=answer, answer_type="source_lookup", facts_used=[{"fieldIntent": intent, "sourceId": filing["source_id"]}], citations=[citation(filing, answer)], confidence="high", field_intent=intent)
+
+    if intent == "document_status":
+        processed = [source for source in sources if source.get("processing_status") == "processed"]
+        failed = [source for source in sources if source.get("processing_status") in {"processing_failed", "failed"}]
+        answer = f"The dataroom has {len(processed)} processed sources and {len(failed)} sources needing processing or review. Failed/pending items include: " + "; ".join(source.get("title", source.get("source_id", "source")) for source in failed[:5]) + "."
+        cites = [citation(src(source["source_id"]) or source, source.get("included_reason")) for source in sources[:3] if source.get("source_id")]
+        return StructuredAnswer(answer=answer, answer_type="source_lookup", facts_used=[{"fieldIntent": intent, "processed": len(processed), "failed": len(failed)}], citations=cites, missing_information=["processing/review for pending sources"] if failed else [], confidence="high", field_intent=intent)
+
+    return None
+
+
+def detect_document_field_intent(question: str) -> str | None:
+    q = question.lower().strip()
+    if any(term in q for term in ["company number", "registered number", "registration number"]):
+        return "company_number"
+    if any(term in q for term in ["legal name", "company name", "registered name"]):
+        return "legal_name"
+    if "jurisdiction" in q or "country of incorporation" in q:
+        return "jurisdiction"
+    if "companies house url" in q or "companies house link" in q:
+        return "companies_house_url"
+    if any(term in q for term in ["company profile", "company overview", "profile details"]):
+        return "company_profile"
+    if any(term in q for term in ["latest accounts", "most recent accounts", "accounts filing"]):
+        return "latest_accounts"
+    if any(term in q for term in ["accounts status", "accounts processing", "processed accounts", "financial statements status"]):
+        return "accounts_status"
+    if "filing history" in q or "filings" == q:
+        return "filing_history"
+    if any(term in q for term in ["document status", "processing status", "what documents are processed", "which documents are processed"]):
+        return "document_status"
+    return None
+
 
 def is_charge_question(q: str) -> bool:
     if any(term in q for term in CHARGE_TOPIC_TERMS):

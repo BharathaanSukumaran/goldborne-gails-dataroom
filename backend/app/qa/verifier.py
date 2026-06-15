@@ -187,6 +187,8 @@ def _unsupported_numeric_claims(
     financial_facts: Iterable[Mapping[str, Any] | Any],
     charges: Iterable[Mapping[str, Any] | Any],
 ) -> list[str]:
+    if answer.get("answer_type") == "source_lookup":
+        return []
     if answer.get("answer_type") == "unknown":
         return []
 

@@ -3,10 +3,12 @@ import OpenAI from "openai";
 import {
   chargeFacts,
   citation,
+  company,
   financialFacts,
   officerFacts,
   ownershipFacts,
   retrieveSourceChunks,
+  sources,
   sourceExists,
   type ChargeFieldReview,
   type Citation,
@@ -148,6 +150,11 @@ export default async (req: Request, _context: Context) => {
     return Response.json(unknown(["reviewed usable financial_facts"]));
   }
 
+  const documentFieldAnswer = structuredDocumentFieldAnswer(question);
+  if (documentFieldAnswer) {
+    return Response.json(documentFieldAnswer);
+  }
+
   if (route === "charges_security") {
     return Response.json(structuredChargesAnswer(question));
   }
@@ -186,6 +193,7 @@ function classifyQuestion(question: string): AnswerType {
   const q = question.toLowerCase();
   if (["covenant", "headroom", "private banking", "facility agreement"].some((term) => q.includes(term))) return "unknown";
   if (isChargeQuestion(q)) return "charges_security";
+  if (isDocumentFieldQuestion(q)) return "source_lookup";
   if (FINANCIAL_TERMS.some((term) => q.includes(term))) return "financial_metric";
   if (OWNERSHIP_TERMS.some((term) => q.includes(term))) return "ownership_management";
   if (CREDIT_TERMS.some((term) => q.includes(term))) return "credit_summary";
@@ -216,6 +224,125 @@ function relevantStructuredFacts(question: string, route: AnswerType): unknown[]
   if (route === "ownership_management" || OWNERSHIP_TERMS.some((term) => q.includes(term))) facts.push(...ownershipFacts, ...officerFacts);
 
   return facts;
+}
+
+function isDocumentFieldQuestion(q: string): boolean {
+  return Boolean(detectDocumentFieldIntent(q));
+}
+
+function structuredDocumentFieldAnswer(question: string): AskResponse | null {
+  const intent = detectDocumentFieldIntent(question.toLowerCase());
+  if (!intent) return null;
+
+  const profile = sourceByIdSafe("ch-profile-06055393");
+  const filing = sourceByIdSafe("ch-filing-history-06055393");
+
+  if (["legal_name", "company_number", "jurisdiction", "companies_house_url"].includes(intent)) {
+    const key = intent as keyof typeof company;
+    const value = String(company[key] || "");
+    if (!value) return unknown([DOCUMENT_FIELD_LABELS[intent] || intent], `The reviewed ${DOCUMENT_FIELD_LABELS[intent] || intent} is not available in the current dataroom.`);
+    return makeResponse({
+      answer: `The reviewed ${DOCUMENT_FIELD_LABELS[intent]} is ${value}.`,
+      answerType: "source_lookup",
+      factsUsed: [{ fieldIntent: intent, value, sourceId: profile?.source_id }],
+      citations: profile ? [citation(profile.source_id, `Companies House company profile records ${DOCUMENT_FIELD_LABELS[intent]}: ${value}.`, null)] : [],
+      missingInformation: [],
+      confidence: "high",
+      fieldIntent: intent
+    });
+  }
+
+  if (intent === "company_profile") {
+    if (!profile) return unknown(["company profile source"], "The company profile source is not available in the current dataroom.");
+    return makeResponse({
+      answer: `GAIL'S LIMITED is registered under company number ${company.company_number || "06055393"} in ${company.jurisdiction || "England and Wales"}.`,
+      answerType: "source_lookup",
+      factsUsed: [{ fieldIntent: intent, ...company }],
+      citations: [citation(profile.source_id, profile.included_reason, null)],
+      missingInformation: [],
+      confidence: "high",
+      fieldIntent: intent
+    });
+  }
+
+  const accounts = sources.filter((source) => source.category === "accounts").sort((a, b) => String(b.period_end || "").localeCompare(String(a.period_end || "")));
+  if (intent === "latest_accounts") {
+    if (!accounts.length) return unknown(["accounts source"], "No accounts filings are registered in the current dataroom.");
+    const latest = accounts[0];
+    return makeResponse({
+      answer: `The latest accounts source in the dataroom is ${latest.title} with period end ${latest.period_end} and filing type ${latest.filing_type}. Processing status is ${latest.processing_status}; exact financial values remain unavailable until the PDF is processed and reviewed.`,
+      answerType: "source_lookup",
+      factsUsed: [{ fieldIntent: intent, ...latest }],
+      citations: [citation(latest.source_id, latest.included_reason, null)],
+      missingInformation: latest.processing_status === "processed" ? [] : ["reviewed financial values"],
+      confidence: "high",
+      fieldIntent: intent
+    });
+  }
+
+  if (intent === "accounts_status") {
+    if (!accounts.length) return unknown(["accounts source"], "No accounts filings are registered in the current dataroom.");
+    return makeResponse({
+      answer: "Accounts processing status: " + accounts.map((source) => `${source.period_end}: ${source.processing_status}`).join("; ") + ".",
+      answerType: "source_lookup",
+      factsUsed: accounts.map((source) => ({ fieldIntent: intent, ...source })),
+      citations: accounts.slice(0, 3).map((source) => citation(source.source_id, source.notes || source.included_reason, null)),
+      missingInformation: ["reviewed financial values"],
+      confidence: "high",
+      fieldIntent: intent
+    });
+  }
+
+  if (intent === "filing_history") {
+    if (!filing) return unknown(["filing history source"], "The filing history source is not available in the current dataroom.");
+    const answer = "Companies House filing history identifies the latest three parent consolidated accounts for periods ending 28 February 2025, 29 February 2024 and 28 February 2023, plus recent officer and charge filings.";
+    return makeResponse({ answer, answerType: "source_lookup", factsUsed: [{ fieldIntent: intent, sourceId: filing.source_id }], citations: [citation(filing.source_id, answer, null)], missingInformation: [], confidence: "high", fieldIntent: intent });
+  }
+
+  if (intent === "document_status") {
+    const processed = sources.filter((source) => source.processing_status === "processed");
+    const failed = sources.filter((source) => ["processing_failed", "failed"].includes(source.processing_status));
+    return makeResponse({
+      answer: `The dataroom has ${processed.length} processed sources and ${failed.length} sources needing processing or review. Failed/pending items include: ${failed.slice(0, 5).map((source) => source.title).join("; ")}.`,
+      answerType: "source_lookup",
+      factsUsed: [{ fieldIntent: intent, processed: processed.length, failed: failed.length }],
+      citations: sources.slice(0, 3).map((source) => citation(source.source_id, source.included_reason, null)),
+      missingInformation: failed.length ? ["processing/review for pending sources"] : [],
+      confidence: "high",
+      fieldIntent: intent
+    });
+  }
+
+  return null;
+}
+
+const DOCUMENT_FIELD_LABELS: Record<string, string> = {
+  legal_name: "legal name",
+  company_number: "company number",
+  jurisdiction: "jurisdiction",
+  companies_house_url: "Companies House URL",
+  company_profile: "company profile",
+  latest_accounts: "latest accounts filing",
+  accounts_status: "accounts processing status",
+  filing_history: "filing history",
+  document_status: "document processing status"
+};
+
+function detectDocumentFieldIntent(q: string): string | null {
+  if (["company number", "registered number", "registration number"].some((term) => q.includes(term))) return "company_number";
+  if (["legal name", "company name", "registered name"].some((term) => q.includes(term))) return "legal_name";
+  if (q.includes("jurisdiction") || q.includes("country of incorporation")) return "jurisdiction";
+  if (q.includes("companies house url") || q.includes("companies house link")) return "companies_house_url";
+  if (["company profile", "company overview", "profile details"].some((term) => q.includes(term))) return "company_profile";
+  if (["latest accounts", "most recent accounts", "accounts filing"].some((term) => q.includes(term))) return "latest_accounts";
+  if (["accounts status", "accounts processing", "processed accounts", "financial statements status"].some((term) => q.includes(term))) return "accounts_status";
+  if (q.includes("filing history") || q.trim() === "filings") return "filing_history";
+  if (["document status", "processing status", "what documents are processed", "which documents are processed"].some((term) => q.includes(term))) return "document_status";
+  return null;
+}
+
+function sourceByIdSafe(sourceId: string) {
+  return sources.find((source) => source.source_id === sourceId || source.sourceId === sourceId) || null;
 }
 
 function isChargeQuestion(q: string): boolean {

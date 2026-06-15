@@ -15,8 +15,14 @@ def test_verifier_rejects_unsupported_money_claim():
 
 def test_verifier_allows_dates_and_charge_numbers_when_supported_by_charges():
     result = verify_answer(
-        {"answer": "Charge 0605 5393 0006 was created on 2022-06-06.", "citations": [], "facts_used": [], "answer_type": "structured"},
+        {
+            "answer": "Charge 0605 5393 0006 was created on 2022-06-06.",
+            "citations": [{"source_id": "ch-charge-0006"}],
+            "facts_used": [],
+            "answer_type": "structured",
+        },
         charges=[{"charge_id": "0605 5393 0006", "created_on": "2022-06-06"}],
+        manifest_sources=[{"source_id": "ch-charge-0006"}],
     )
     assert result.passed is True
     assert result.errors == ()
@@ -276,3 +282,74 @@ def test_verifier_rejects_empty_citation_source_id():
 
     assert result.passed is False
     assert any("cited source_id is not in manifest" in error for error in result.errors)
+
+
+def test_verifier_requires_manifest_backed_citations_for_non_unknown_answers():
+    result = verify_answer(
+        {
+            "answer": "Charge 0605 5393 0006 was created on 2022-06-06.",
+            "citations": [],
+            "facts_used": [],
+            "answer_type": "charges_security",
+        },
+        charges=[{"charge_id": "0605 5393 0006", "created_on": "2022-06-06"}],
+        manifest_sources=[{"source_id": "ch-charge-0006"}],
+    )
+
+    assert result.passed is False
+    assert "answer requires citations resolving to manifest source_id" in result.errors
+
+
+def test_verifier_blocks_unsupported_charge_asset_security_descriptions():
+    result = verify_answer(
+        {
+            "answer": "Charge 0605 5393 0006 is a fixed and floating charge secured over all assets and property.",
+            "citations": [{"source_id": "ch-charge-0006"}],
+            "facts_used": [],
+            "answer_type": "charges_security",
+        },
+        charges=[{"charge_id": "0605 5393 0006", "created_on": "2022-06-06", "holder": "Glas Trust Corporation Limited"}],
+        manifest_sources=[{"source_id": "ch-charge-0006"}],
+    )
+
+    assert result.passed is False
+    assert any("unsupported charge description/assets/security claim" in error for error in result.errors)
+
+
+def test_verifier_allows_charge_descriptions_when_supported_by_charge_facts():
+    result = verify_answer(
+        {
+            "answer": "Charge 0605 5393 0006 is described as a fixed and floating charge over assets.",
+            "citations": [{"source_id": "ch-charge-0006"}],
+            "facts_used": [],
+            "answer_type": "charges_security",
+        },
+        charges=[
+            {
+                "charge_id": "0605 5393 0006",
+                "created_on": "2022-06-06",
+                "holder": "Glas Trust Corporation Limited",
+                "description": "fixed and floating charge over assets",
+            }
+        ],
+        manifest_sources=[{"source_id": "ch-charge-0006"}],
+    )
+
+    assert result.passed is True
+
+
+def test_verifier_blocks_generic_charge_list_for_specific_field_request():
+    result = verify_answer(
+        {
+            "answer": "Charge 0605 5393 0006 was created on 2022-06-06; status outstanding; holder/person entitled: Glas Trust Corporation Limited.",
+            "citations": [{"source_id": "ch-charge-0006"}],
+            "facts_used": [],
+            "answer_type": "charges_security",
+        },
+        question="What assets are covered by the registered charge?",
+        charges=[{"charge_id": "0605 5393 0006", "created_on": "2022-06-06", "holder": "Glas Trust Corporation Limited"}],
+        manifest_sources=[{"source_id": "ch-charge-0006"}],
+    )
+
+    assert result.passed is False
+    assert "generic charge-list answer for specific charge field request" in result.errors

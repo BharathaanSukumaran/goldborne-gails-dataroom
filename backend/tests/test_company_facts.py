@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +9,7 @@ from backend.app.facts.charges import (
     ChargeFact,
     SourceCitation,
     build_charges_answer,
+    load_charge_facts_json,
 )
 from backend.app.facts.ownership import (
     ManagementChangeFact,
@@ -38,6 +40,7 @@ def test_charges_answer_lists_holders_status_and_citations() -> None:
         persons_entitled=("Example Bank PLC",),
         classification="debenture",
         description="Fixed and floating charge over assets.",
+        field_review={"description": True},
         citations=(citation(),),
     )
 
@@ -78,6 +81,41 @@ def test_empty_charges_answer_reports_unknown_not_no_charges() -> None:
     assert answer["confidence"] == "low"
     assert "cannot identify registered charges" in answer["answer"]
     assert "Companies House charge register facts" in answer["missing_information"]
+
+
+def test_unreviewed_charge_fields_are_not_answerable() -> None:
+    charge = ChargeFact(
+        charge_id="0605 5393 0006",
+        short_code="0006",
+        created_on=date(2022, 6, 6),
+        registered_on=None,
+        status="outstanding",
+        persons_entitled=("Glas Trust Corporation Limited",),
+        description="Candidate description that has not been reviewed.",
+        secured_assets="Candidate all-assets wording that has not been reviewed.",
+        citations=(citation("ch-charge-0006"),),
+    )
+
+    assert charge.is_field_answerable("holder") is True
+    assert charge.reviewed_value("holder") == ("Glas Trust Corporation Limited",)
+    assert charge.is_field_answerable("description") is False
+    assert charge.reviewed_value("description") is None
+    assert charge.is_field_answerable("securedAssets") is False
+
+    answer = build_charges_answer([charge]).to_dict()
+    assert "Candidate description" not in answer["answer"]
+
+
+def test_charge_facts_json_has_field_level_review_gates() -> None:
+    facts = load_charge_facts_json(Path("backend/data/charge_facts.json"))
+
+    charge_0006 = next(fact for fact in facts if fact.short_code == "0006")
+    assert charge_0006.reviewed_value("holder") == ("Glas Trust Corporation Limited",)
+    assert charge_0006.reviewed_value("createdDate") == "2022-06-06"
+    assert charge_0006.reviewed_value("description") is None
+    assert charge_0006.reviewed_value("securedAssets") is None
+    assert charge_0006.field_review["description"] is False
+    assert charge_0006.field_review["securedAssets"] is False
 
 
 def test_current_directors_filters_resigned_officers_and_cites_sources() -> None:

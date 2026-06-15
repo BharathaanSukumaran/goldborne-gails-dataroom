@@ -4,13 +4,23 @@
       "id": "brief_revenue_ebitda_exact_or_unknown",
       "question": "What was revenue and EBITDA in the last reported year?",
       "expect": {
-        "answer_type_any_of": ["financial", "structured", "unknown"],
+        "answer_type_any_of": [
+          "financial",
+          "structured",
+          "unknown"
+        ],
         "requires_citations": true,
         "forbid_approximation_words": true,
         "forbid_unsupported_money": true,
         "financial_metrics": [
-          {"metric": "revenue", "mode": "unknown_until_extracted"},
-          {"metric": "ebitda", "mode": "unknown_until_extracted"}
+          {
+            "metric": "revenue",
+            "mode": "unknown_until_extracted"
+          },
+          {
+            "metric": "ebitda",
+            "mode": "unknown_until_extracted"
+          }
         ]
       }
     },
@@ -18,16 +28,30 @@
       "id": "brief_charges_have_holder_status_and_sources",
       "question": "What charges are registered against the company and who holds them?",
       "expect": {
-        "answer_type_any_of": ["charges", "charges_security", "structured", "unknown"],
+        "answer_type_any_of": [
+          "charges",
+          "charges_security",
+          "structured",
+          "unknown"
+        ],
         "requires_citations": true,
-        "must_not_contain": ["no charges", "none registered"]
+        "must_not_contain": [
+          "no charges",
+          "none registered"
+        ]
       }
     },
     {
       "id": "brief_lender_risks_are_sourced_or_unknown",
       "question": "What are the key risks for a lender?",
       "expect": {
-        "answer_type_any_of": ["retrieval", "hybrid", "narrative", "credit_summary", "unknown"],
+        "answer_type_any_of": [
+          "retrieval",
+          "hybrid",
+          "narrative",
+          "credit_summary",
+          "unknown"
+        ],
         "requires_citations": true,
         "forbid_approximation_words": true
       }
@@ -36,7 +60,13 @@
       "id": "brief_credit_summary_is_sourced_or_unknown",
       "question": "Draft a short credit summary of the business.",
       "expect": {
-        "answer_type_any_of": ["retrieval", "hybrid", "narrative", "credit_summary", "unknown"],
+        "answer_type_any_of": [
+          "retrieval",
+          "hybrid",
+          "narrative",
+          "credit_summary",
+          "unknown"
+        ],
         "requires_citations": true,
         "forbid_approximation_words": true
       }
@@ -45,12 +75,19 @@
       "id": "debt_exact_or_unknown",
       "question": "What is the latest debt balance?",
       "expect": {
-        "answer_type_any_of": ["financial", "structured", "unknown"],
+        "answer_type_any_of": [
+          "financial",
+          "structured",
+          "unknown"
+        ],
         "requires_citations": true,
         "forbid_approximation_words": true,
         "forbid_unsupported_money": true,
         "financial_metrics": [
-          {"metric": "debt", "mode": "unknown_until_extracted"}
+          {
+            "metric": "debt",
+            "mode": "unknown_until_extracted"
+          }
         ]
       }
     },
@@ -58,11 +95,199 @@
       "id": "private_covenants_unknown",
       "question": "What are the company's private banking covenants and headroom?",
       "expect": {
-        "answer_type_any_of": ["unknown"],
+        "answer_type_any_of": [
+          "unknown"
+        ],
         "requires_unknown": true,
         "requires_missing_information": true,
         "forbid_unsupported_money": true,
-        "must_not_contain": ["comfortable headroom", "no covenant risk"]
+        "must_not_contain": [
+          "comfortable headroom",
+          "no covenant risk"
+        ]
+      }
+    },
+    {
+      "id": "charge_holder_0006",
+      "question": "Who holds charge 0006?",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "must_contain": [
+          "Glas Trust Corporation Limited"
+        ],
+        "must_not_contain": [
+          "0605 5393 0005"
+        ],
+        "charge_field": {
+          "field_intent": "charge_holder",
+          "resolved_charge_code": "060553930006",
+          "expected_source_id": "ch-charge-0006",
+          "must_contain": [
+            "Glas Trust Corporation Limited"
+          ],
+          "forbid_generic_charge_list": true
+        }
+      }
+    },
+    {
+      "id": "charge_status_0005",
+      "question": "What is the status of charge 0005?",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "must_contain": [
+          "outstanding"
+        ],
+        "must_not_contain": [
+          "0605 5393 0006"
+        ],
+        "charge_field": {
+          "field_intent": "charge_status",
+          "resolved_charge_code": "060553930005",
+          "expected_source_id": "ch-charge-0005",
+          "must_contain": [
+            "outstanding"
+          ],
+          "forbid_generic_charge_list": true
+        }
+      }
+    },
+    {
+      "id": "charge_description_unavailable",
+      "question": "What is the description of charge 0006?",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "requires_missing_information": true,
+        "must_contain": [
+          "reviewed charge description"
+        ],
+        "must_not_contain": [
+          "all assets",
+          "fixed charge",
+          "floating charge"
+        ],
+        "charge_field": {
+          "field_intent": "charge_description",
+          "resolved_charge_code": "060553930006",
+          "expected_source_id": "ch-charge-0006",
+          "requires_unavailable": true,
+          "forbid_generic_charge_list": true
+        }
+      }
+    },
+    {
+      "id": "secured_assets_unavailable",
+      "question": "What assets are secured by charge 0006?",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "requires_missing_information": true,
+        "must_not_contain": [
+          "all assets",
+          "fixed charge",
+          "floating charge"
+        ],
+        "charge_field": {
+          "field_intent": "secured_assets",
+          "resolved_charge_code": "060553930006",
+          "expected_source_id": "ch-charge-0006",
+          "requires_unavailable": true,
+          "forbid_generic_charge_list": true
+        }
+      }
+    },
+    {
+      "id": "charge_created_date_0006",
+      "question": "When was charge 0006 created?",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "must_contain": [
+          "2022-06-06"
+        ],
+        "must_not_contain": [
+          "0605 5393 0005"
+        ],
+        "charge_field": {
+          "field_intent": "charge_created_date",
+          "resolved_charge_code": "060553930006",
+          "expected_source_id": "ch-charge-0006",
+          "must_contain": [
+            "2022-06-06"
+          ],
+          "forbid_generic_charge_list": true
+        }
+      }
+    },
+    {
+      "id": "charge_year_resolution_2021",
+      "question": "What is the description of the 2021 charge?",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "requires_missing_information": true,
+        "must_contain": [
+          "0605 5393 0005"
+        ],
+        "must_not_contain": [
+          "0605 5393 0006"
+        ],
+        "charge_field": {
+          "field_intent": "charge_description",
+          "resolved_charge_code": "060553930005",
+          "expected_source_id": "ch-charge-0005",
+          "requires_unavailable": true,
+          "forbid_generic_charge_list": true
+        }
+      }
+    },
+    {
+      "id": "no_generic_answer_for_specific_charge_field",
+      "question": "What is the description of the 2022 charge?",
+      "expect": {
+        "answer_type_any_of": [
+          "charges_security",
+          "charges",
+          "structured"
+        ],
+        "requires_citations": true,
+        "requires_missing_information": true,
+        "must_not_contain": [
+          "Charge 0605 5393 0005 was created"
+        ],
+        "charge_field": {
+          "field_intent": "charge_description",
+          "resolved_charge_code": "060553930006",
+          "expected_source_id": "ch-charge-0006",
+          "requires_unavailable": true,
+          "forbid_generic_charge_list": true
+        }
       }
     }
   ]

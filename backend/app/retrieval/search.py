@@ -28,14 +28,107 @@ EXACT_FACT_TERMS = {
     "liabilities",
     "charge",
     "charges",
+    "collateral",
+    "debenture",
+    "fixed",
+    "floating",
     "lender",
     "lenders",
+    "obligation",
+    "obligations",
+    "particulars",
+    "secured",
+    "security",
+    "undertaking",
     "director",
     "directors",
     "ownership",
     "owner",
     "psc",
     "shareholder",
+}
+CHARGE_QUERY_TERMS = {
+    "charge",
+    "charges",
+    "security",
+    "secured",
+    "collateral",
+    "lender",
+    "lenders",
+    "holder",
+    "holders",
+    "entitled",
+    "particulars",
+    "assets",
+    "obligation",
+    "obligations",
+    "fixed",
+    "floating",
+    "debenture",
+    "mortgage",
+}
+CHARGE_FIELD_SYNONYMS: Mapping[str, tuple[str, ...]] = {
+    "description": (
+        "description",
+        "described",
+        "particulars",
+        "short",
+        "details",
+        "instrument",
+        "deed",
+    ),
+    "short_particulars": (
+        "short",
+        "particulars",
+        "description",
+        "assets",
+        "property",
+        "undertaking",
+        "fixed",
+        "floating",
+    ),
+    "secured_assets": (
+        "secured",
+        "assets",
+        "asset",
+        "collateral",
+        "property",
+        "undertaking",
+        "receivables",
+        "rights",
+        "fixed",
+        "floating",
+    ),
+    "security_type": (
+        "security",
+        "type",
+        "classification",
+        "fixed",
+        "floating",
+        "debenture",
+        "mortgage",
+        "charge",
+    ),
+    "obligations": (
+        "obligation",
+        "obligations",
+        "liabilities",
+        "indebtedness",
+        "monies",
+        "secured",
+        "due",
+        "covenants",
+    ),
+    "holder": (
+        "holder",
+        "holders",
+        "lender",
+        "lenders",
+        "person",
+        "persons",
+        "entitled",
+        "trustee",
+    ),
 }
 
 
@@ -148,7 +241,7 @@ class LocalKeywordSearchBackend:
         self._document_frequency = self._compute_document_frequency(self._doc_tokens)
 
     def search(self, query: str, *, limit: int = 5) -> list[DocumentChunk]:
-        query_terms = _tokens(query)
+        query_terms = _expanded_query_terms(query)
         if not query_terms or limit <= 0:
             return []
 
@@ -158,12 +251,14 @@ class LocalKeywordSearchBackend:
             if not terms:
                 continue
             score = 0.0
-            for term in query_terms:
-                term_count = terms.count(term)
+            counts = _term_counts(terms)
+            for term, weight in query_terms.items():
+                term_count = counts.get(term, 0)
                 if term_count == 0:
                     continue
                 inverse_doc_frequency = log((1 + total_docs) / (1 + self._document_frequency[term])) + 1
-                score += term_count * inverse_doc_frequency
+                score += term_count * inverse_doc_frequency * weight
+            score += _charge_match_boost(query, chunk, terms)
             if score:
                 scored.append((score, chunk))
 
@@ -314,6 +409,89 @@ def _normalize_text(text: str) -> str:
 
 def _tokens(text: str) -> list[str]:
     return [match.group(0).lower() for match in TOKEN_RE.finditer(text)]
+
+
+def _expanded_query_terms(query: str) -> dict[str, float]:
+    terms = _tokens(query)
+    weighted_terms: dict[str, float] = {term: 1.0 for term in terms}
+    term_set = set(terms)
+    if not _is_charge_query_terms(term_set) and not _charge_codes(query) and not _source_id_mentions(query):
+        return weighted_terms
+
+    for field_terms in CHARGE_FIELD_SYNONYMS.values():
+        if term_set.intersection(field_terms):
+            for synonym in field_terms:
+                weighted_terms[synonym] = max(weighted_terms.get(synonym, 0.0), 0.7)
+    for term in ("charge", "charges", "security", "secured"):
+        weighted_terms[term] = max(weighted_terms.get(term, 0.0), 1.2)
+    return weighted_terms
+
+
+def _is_charge_query_terms(terms: set[str]) -> bool:
+    return bool(terms.intersection(CHARGE_QUERY_TERMS))
+
+
+def _term_counts(terms: Sequence[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for term in terms:
+        counts[term] = counts.get(term, 0) + 1
+    return counts
+
+
+def _charge_match_boost(query: str, chunk: DocumentChunk, chunk_terms: Sequence[str]) -> float:
+    query_terms = set(_tokens(query))
+    if not _is_charge_query_terms(query_terms) and not _charge_codes(query) and not _source_id_mentions(query):
+        return 0.0
+
+    searchable = " ".join(
+        [
+            chunk.source_id,
+            chunk.title,
+            chunk.category or "",
+            chunk.text,
+            " ".join(str(value) for value in chunk.metadata.values()),
+        ]
+    )
+    searchable_lower = searchable.lower()
+    searchable_compact = _compact_identifier(searchable)
+    score = 0.0
+
+    for code in _charge_codes(query):
+        if code in searchable_compact:
+            score += 18.0
+            source_tail = f"ch-charge-{code[-4:]}"
+            if chunk.source_id.lower() == source_tail:
+                score += 10.0
+
+    for source_id in _source_id_mentions(query):
+        if source_id == chunk.source_id.lower():
+            score += 20.0
+        elif source_id in searchable_lower:
+            score += 8.0
+
+    if chunk.category == "charges":
+        score += 4.0
+    elif "charge" in chunk.source_id.lower():
+        score += 2.0
+
+    chunk_term_set = set(chunk_terms)
+    for field_terms in CHARGE_FIELD_SYNONYMS.values():
+        if query_terms.intersection(field_terms) and chunk_term_set.intersection(field_terms):
+            score += 2.5
+    return score
+
+
+def _charge_codes(text: str) -> set[str]:
+    compact = _compact_identifier(text)
+    return set(re.findall(r"06055393\d{4}", compact))
+
+
+def _source_id_mentions(text: str) -> set[str]:
+    return {match.group(0).lower() for match in re.finditer(r"ch-charge-\d{4}", text, re.IGNORECASE)}
+
+
+def _compact_identifier(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
 def _field(item: Mapping[str, Any] | Any, name: str) -> Any:

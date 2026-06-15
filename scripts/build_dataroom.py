@@ -13,6 +13,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "dataroom" / "manifest.json"
 FACTS_PATH = ROOT / "backend" / "data" / "financial_facts.json"
+CHARGE_FACTS_PATH = ROOT / "backend" / "data" / "charge_facts.json"
 REPORT_PATH = ROOT / "dataroom" / "processed" / "source_coverage_report.json"
 
 CRITICAL_METRICS = ["revenue", "ebitda", "debt"]
@@ -34,13 +35,27 @@ def load_json(path: Path) -> dict[str, Any]:
 def build_summary() -> dict[str, Any]:
     manifest = load_json(MANIFEST_PATH)
     facts_payload = load_json(FACTS_PATH)
+    charge_facts_payload = load_json(CHARGE_FACTS_PATH)
     report = load_json(REPORT_PATH)
     sources = manifest.get("sources", [])
     facts = facts_payload.get("facts", facts_payload if isinstance(facts_payload, list) else [])
+    charge_facts = charge_facts_payload.get("facts", charge_facts_payload if isinstance(charge_facts_payload, list) else [])
     processed_sources = [source for source in sources if source.get("processing_status") in {"processed", "verified"}]
     failed_sources = [source for source in sources if source.get("processing_status") in {"failed", "processing_failed"}]
     extracted_candidates = [fact for fact in facts if fact.get("value") not in {None, ""}]
     reviewed_usable = [fact for fact in facts if fact.get("reviewed") is True and fact.get("usedInAnswers") is True]
+    extracted_charge_candidates = [
+        (fact, field)
+        for fact in charge_facts
+        for field in ["description", "shortParticulars", "securedAssets", "securityType", "obligationsSecured", "instrumentSummary"]
+        if fact.get(field) not in {None, ""}
+    ]
+    reviewed_charge_fields = [
+        (fact, field)
+        for fact in charge_facts
+        for field, reviewed in (fact.get("fieldReview") or {}).items()
+        if reviewed is True and fact.get(field) not in {None, ""}
+    ]
     usable_metrics = {str(fact.get("metric")).lower() for fact in reviewed_usable}
     missing_critical = [metric for metric in CRITICAL_METRICS if metric not in usable_metrics]
     return {
@@ -49,6 +64,8 @@ def build_summary() -> dict[str, Any]:
         "failed_sources": len(failed_sources),
         "extracted_candidate_facts": len(extracted_candidates),
         "reviewed_usable_facts": len(reviewed_usable),
+        "extracted_charge_candidate_fields": len(extracted_charge_candidates),
+        "reviewed_charge_fields": len(reviewed_charge_fields),
         "missing_critical_facts": missing_critical,
         "required_categories_missing": report.get("required_categories_missing", []),
     }
@@ -61,6 +78,8 @@ def print_summary(summary: dict[str, Any]) -> None:
     print(f"Failed sources: {summary['failed_sources']}")
     print(f"Extracted candidate facts: {summary['extracted_candidate_facts']}")
     print(f"Reviewed usable facts: {summary['reviewed_usable_facts']}")
+    print(f"Extracted charge candidate fields: {summary['extracted_charge_candidate_fields']}")
+    print(f"Reviewed charge fields: {summary['reviewed_charge_fields']}")
     missing = summary["missing_critical_facts"]
     print(f"Missing critical facts: {', '.join(missing) if missing else 'none'}")
     categories = summary["required_categories_missing"]
@@ -75,6 +94,7 @@ def main() -> None:
     run_step("Refresh Companies House manifest", ["scripts/ingest_companies_house.py"])
     run_step("Process local documents", ["scripts/process_documents.py", "--process", "--update-manifest"])
     run_step("Extract candidate financial facts", ["scripts/extract_financials.py"])
+    run_step("Extract candidate charge facts", ["scripts/extract_charges.py"])
     run_step("Validate source coverage", ["scripts/process_documents.py", "--update-manifest"])
 
     summary = build_summary()

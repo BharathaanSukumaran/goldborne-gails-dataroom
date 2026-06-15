@@ -34,6 +34,8 @@ PROCESSED_PATH_BY_SOURCE_ID = {
     "news-community-context-2024-placeholder": "dataroom/processed/guardian_community_2024.md",
 }
 
+CHARGE_INSTRUMENT_SOURCE_IDS = {"ch-charge-0006", "ch-charge-0005"}
+
 
 def load_manifest(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -104,6 +106,48 @@ def extract_pdf_text(pdf_path: Path) -> tuple[str, str | None]:
     return result.stdout, None
 
 
+def process_charge_instrument_sidecar(source: dict[str, Any], root: Path, processed_dir: Path) -> dict[str, Any]:
+    """Always try to create charge-instrument text sidecars or explicit errors.
+
+    Charge records may also have curated Markdown summaries. Those are useful
+    source notes, but they are not a substitute for processing the underlying
+    legal instrument, so this writes separate hyphenated sidecar files.
+    """
+
+    raw_path = root / source["local_path"]
+    error_path = processed_dir / f"{source['source_id']}.processing_error.json"
+    if not raw_path.exists():
+        message = f"Raw charge instrument is missing at {source['local_path']}; place the PDF/text file there before legal-field extraction."
+        error_path.write_text(json.dumps(error_record(source, message), indent=2) + "\n", encoding="utf-8")
+        return {"status": "processing_failed", "processed_path": str(error_path.relative_to(root)), "page_count": 0, "error": message}
+
+    suffix = raw_path.suffix.lower()
+    if suffix == ".pdf":
+        text, error = extract_pdf_text(raw_path)
+    elif suffix in {".txt", ".md"}:
+        text, error = raw_path.read_text(encoding="utf-8", errors="ignore"), None
+    else:
+        text, error = "", f"Unsupported charge instrument file type: {suffix or 'unknown'}"
+
+    if error is not None or not meaningful_text(text):
+        message = error or "Charge instrument text extraction produced no meaningful text; OCR/manual review required"
+        error_path.write_text(json.dumps(error_record(source, message), indent=2) + "\n", encoding="utf-8")
+        return {"status": "processing_failed", "processed_path": str(error_path.relative_to(root)), "page_count": 0, "error": message}
+
+    text_path = processed_dir / f"{source['source_id']}.txt"
+    text_path.write_text(text, encoding="utf-8")
+    records = [
+        page_record(source, index, page)
+        for index, page in enumerate(split_pages(text), start=1)
+        if page.strip()
+    ]
+    records_path = processed_dir / f"{source['source_id']}.pages.json"
+    records_path.write_text(json.dumps({"pages": records}, indent=2) + "\n", encoding="utf-8")
+    if error_path.exists():
+        error_path.unlink()
+    return {"status": "processed", "processed_path": str(text_path.relative_to(root)), "page_count": len(records), "error": None}
+
+
 def process_source(source: dict[str, Any], root: Path, processed_dir: Path) -> dict[str, Any]:
     raw_path = root / source["local_path"]
     if not raw_path.exists():
@@ -153,6 +197,8 @@ def process_documents(manifest: dict[str, Any], root: Path = ROOT, processed_dir
     processed_dir.mkdir(parents=True, exist_ok=True)
     results: dict[str, Any] = {}
     for source in manifest["sources"]:
+        if source["source_id"] in CHARGE_INSTRUMENT_SOURCE_IDS:
+            results[f"{source['source_id']}:instrument"] = process_charge_instrument_sidecar(source, root, processed_dir)
         if source.get("processed_path") and (root / source["processed_path"]).exists() and source.get("processing_status") in {"processed", "verified"}:
             results[source["source_id"]] = {
                 "status": source["processing_status"],

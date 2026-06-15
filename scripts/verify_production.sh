@@ -15,6 +15,11 @@ ask_financial_json="$tmp_dir/ask_financial.json"
 ask_unsupported_json="$tmp_dir/ask_unsupported.json"
 ask_missing_json="$tmp_dir/ask_missing.json"
 ask_empty_json="$tmp_dir/ask_empty.json"
+ask_charge_holder_json="$tmp_dir/ask_charge_holder.json"
+ask_charge_status_json="$tmp_dir/ask_charge_status.json"
+ask_charge_created_json="$tmp_dir/ask_charge_created.json"
+ask_charge_description_json="$tmp_dir/ask_charge_description.json"
+ask_charge_assets_json="$tmp_dir/ask_charge_assets.json"
 bundle_urls="$tmp_dir/bundle_urls.txt"
 bundle_js="$tmp_dir/frontend_bundle.js"
 
@@ -42,6 +47,31 @@ curl -fsSL "$BASE_URL/api/ask" \
   -d '{"workspaceId":"gails-limited","question":"What are the covenant headroom, facility margin and private banking terms?"}' \
   -o "$ask_unsupported_json"
 
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"Who holds charge 0006?"}' \
+  -o "$ask_charge_holder_json"
+
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"What is the status of charge 0005?"}' \
+  -o "$ask_charge_status_json"
+
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"When was charge 0006 created?"}' \
+  -o "$ask_charge_created_json"
+
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"What is the description of charge 0006?"}' \
+  -o "$ask_charge_description_json"
+
+curl -fsSL "$BASE_URL/api/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"gails-limited","question":"What assets are secured by charge 0006?"}' \
+  -o "$ask_charge_assets_json"
+
 missing_status="$(curl -sS -L -w "%{http_code}" "$BASE_URL/api/ask" \
   -H "Content-Type: application/json" \
   -d '{}' \
@@ -52,7 +82,7 @@ empty_status="$(curl -sS -L -w "%{http_code}" "$BASE_URL/api/ask" \
   -d '{"workspaceId":"gails-limited","question":""}' \
   -o "$ask_empty_json")"
 
-node - "$page_html" "$health_json" "$sources_json" "$ask_credit_json" "$ask_financial_json" "$ask_unsupported_json" "$missing_status" "$empty_status" "$ask_missing_json" "$ask_empty_json" <<'NODE'
+node - "$page_html" "$health_json" "$sources_json" "$ask_credit_json" "$ask_financial_json" "$ask_unsupported_json" "$ask_charge_holder_json" "$ask_charge_status_json" "$ask_charge_created_json" "$ask_charge_description_json" "$ask_charge_assets_json" "$missing_status" "$empty_status" "$ask_missing_json" "$ask_empty_json" <<'NODE'
 const fs = require("node:fs");
 const [
   pagePath,
@@ -61,6 +91,11 @@ const [
   askCreditPath,
   askFinancialPath,
   askUnsupportedPath,
+  askChargeHolderPath,
+  askChargeStatusPath,
+  askChargeCreatedPath,
+  askChargeDescriptionPath,
+  askChargeAssetsPath,
   missingStatus,
   emptyStatus,
   askMissingPath,
@@ -72,6 +107,11 @@ const sourcesPayload = JSON.parse(fs.readFileSync(sourcesPath, "utf8"));
 const askCredit = JSON.parse(fs.readFileSync(askCreditPath, "utf8"));
 const askFinancial = JSON.parse(fs.readFileSync(askFinancialPath, "utf8"));
 const askUnsupported = JSON.parse(fs.readFileSync(askUnsupportedPath, "utf8"));
+const askChargeHolder = JSON.parse(fs.readFileSync(askChargeHolderPath, "utf8"));
+const askChargeStatus = JSON.parse(fs.readFileSync(askChargeStatusPath, "utf8"));
+const askChargeCreated = JSON.parse(fs.readFileSync(askChargeCreatedPath, "utf8"));
+const askChargeDescription = JSON.parse(fs.readFileSync(askChargeDescriptionPath, "utf8"));
+const askChargeAssets = JSON.parse(fs.readFileSync(askChargeAssetsPath, "utf8"));
 const askMissingBody = fs.readFileSync(askMissingPath, "utf8");
 const askEmptyBody = fs.readFileSync(askEmptyPath, "utf8");
 
@@ -103,12 +143,31 @@ const unsupportedType = askUnsupported.answer_type || askUnsupported.answerType;
 if (!creditAnswer || /lorem ipsum|hardcoded demo answer/i.test(creditAnswer)) failures.push("/api/ask credit response looks empty or hardcoded");
 if (!creditCitations.length) failures.push("/api/ask credit response has no citations");
 if (financialType !== "unknown") failures.push(`financial question with unavailable figures should be unknown, got ${financialType}`);
-if (!/not available|cannot answer|unavailable/i.test(financialAnswer)) failures.push("unsupported financial response does not clearly say unavailable/unknown");
+if (!/not available|cannot answer|unavailable|does not contain/i.test(financialAnswer)) failures.push("unsupported financial response does not clearly say unavailable/unknown");
 if (!Array.isArray(financialMissing) || !financialMissing.length) failures.push("unsupported financial response missing missing_information");
 if (/[£$]\s*\d|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d+(?:\.\d+)?m\b/i.test(financialAnswer)) failures.push("unsupported financial response appears to invent numeric financials");
 if (unsupportedType !== "unknown") failures.push(`unsupported question should be unknown, got ${unsupportedType}`);
 if (!/not available|cannot answer|unavailable|missing/i.test(unsupportedAnswer)) failures.push("unsupported response does not clearly say unavailable/missing");
 if (!Array.isArray(unsupportedMissing) || !unsupportedMissing.length) failures.push("unsupported response missing missing_information");
+
+function chargeCode(value) { return String(value || "").replace(/\D/g, ""); }
+function assertChargeResponse(label, response, { intent, code, answerPattern, unavailable = false }) {
+  const answer = String(response.answer || "");
+  const citations = Array.isArray(response.citations) ? response.citations : [];
+  const missing = response.missing_information || response.missingInformation || [];
+  if ((response.answer_type || response.answerType) !== "charges_security") failures.push(`${label} should be charges_security`);
+  if (response.field_intent !== intent && response.fieldIntent !== intent) failures.push(`${label} field intent mismatch`);
+  if (code && chargeCode(response.resolved_charge_code || response.resolvedChargeCode) !== chargeCode(code)) failures.push(`${label} resolved charge mismatch`);
+  if (!answerPattern.test(answer)) failures.push(`${label} answer did not match expected grounded content`);
+  if (!citations.length) failures.push(`${label} response has no citations`);
+  if (unavailable && (!Array.isArray(missing) || !missing.length)) failures.push(`${label} unavailable response missing missing_information`);
+}
+
+assertChargeResponse("charge holder", askChargeHolder, { intent: "charge_holder", code: "060553930006", answerPattern: /Glas Trust Corporation Limited/i });
+assertChargeResponse("charge status", askChargeStatus, { intent: "charge_status", code: "060553930005", answerPattern: /outstanding/i });
+assertChargeResponse("charge created date", askChargeCreated, { intent: "charge_created_date", code: "060553930006", answerPattern: /2022-06-06|6 June 2022/i });
+assertChargeResponse("charge description", askChargeDescription, { intent: "charge_description", code: "060553930006", answerPattern: /not available|cannot answer|unavailable|does not contain/i, unavailable: true });
+assertChargeResponse("charge secured assets", askChargeAssets, { intent: "secured_assets", code: "060553930006", answerPattern: /not available|cannot answer|unavailable|does not contain/i, unavailable: true });
 
 for (const [label, status, body] of [
   ["missing query", missingStatus, askMissingBody],
@@ -127,6 +186,7 @@ console.log(`Production API: ${sources.length} sources, ${indexed} indexed`);
 console.log(`Ask credit: ${creditCitations.length} citations, confidence=${askCredit.confidence || "n/a"}`);
 console.log(`Ask financial: type=${financialType}, missing=${Array.isArray(financialMissing) ? financialMissing.join(",") : "n/a"}`);
 console.log(`Ask unsupported: type=${unsupportedType}, missing=${Array.isArray(unsupportedMissing) ? unsupportedMissing.join(",") : "n/a"}`);
+console.log(`Ask charges: holder=${askChargeHolder.field_intent || askChargeHolder.fieldIntent}, status=${askChargeStatus.field_intent || askChargeStatus.fieldIntent}, unavailable=${askChargeDescription.field_intent || askChargeDescription.fieldIntent}/${askChargeAssets.field_intent || askChargeAssets.fieldIntent}`);
 console.log(`Ask validation errors: missing=${missingStatus}, empty=${emptyStatus}`);
 
 if (failures.length) {

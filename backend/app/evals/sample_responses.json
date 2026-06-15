@@ -4,7 +4,10 @@
     "answer_type": "unknown",
     "facts_used": [],
     "citations": [],
-    "missing_information": ["revenue", "ebitda"],
+    "missing_information": [
+      "revenue",
+      "ebitda"
+    ],
     "confidence": "low"
   },
   "brief_charges_have_holder_status_and_sources": {
@@ -71,7 +74,9 @@
     "answer_type": "unknown",
     "facts_used": [],
     "citations": [],
-    "missing_information": ["debt"],
+    "missing_information": [
+      "debt"
+    ],
     "confidence": "low"
   },
   "private_covenants_unknown": {
@@ -79,7 +84,172 @@
     "answer_type": "unknown",
     "facts_used": [],
     "citations": [],
-    "missing_information": ["private banking covenants", "headroom"],
+    "missing_information": [
+      "private banking covenants",
+      "headroom"
+    ],
+    "confidence": "low"
+  },
+  "charge_holder_0006": {
+    "answer": "Charge 0605 5393 0006 is listed with Glas Trust Corporation Limited as the person entitled / charge holder.",
+    "answer_type": "charges_security",
+    "field_intent": "charge_holder",
+    "resolved_charge_code": "060553930006",
+    "facts_used": [
+      {
+        "chargeCode": "060553930006",
+        "fieldIntent": "charge_holder",
+        "sourceId": "ch-charge-0006"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charge-0006",
+        "title": "Companies House charge 0006 for GAIL'S LIMITED",
+        "snippet": "Charge code 060553930006; person entitled: Glas Trust Corporation Limited."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "high"
+  },
+  "charge_status_0005": {
+    "answer": "Charge 0605 5393 0005 was created on 2021-10-04 and is listed as outstanding.",
+    "answer_type": "charges_security",
+    "field_intent": "charge_status",
+    "resolved_charge_code": "060553930005",
+    "facts_used": [
+      {
+        "chargeCode": "060553930005",
+        "fieldIntent": "charge_status",
+        "sourceId": "ch-charge-0005"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charge-0005",
+        "title": "Companies House charge 0005 for GAIL'S LIMITED",
+        "snippet": "Charge code 060553930005; status: outstanding."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "high"
+  },
+  "charge_description_unavailable": {
+    "answer": "The current dataroom does not contain a reviewed charge description for charge 0605 5393 0006. The underlying charge instrument text needs to be processed and reviewed before that field can be answered.",
+    "answer_type": "charges_security",
+    "field_intent": "charge_description",
+    "resolved_charge_code": "060553930006",
+    "facts_used": [
+      {
+        "chargeCode": "060553930006",
+        "fieldIntent": "charge_description",
+        "sourceId": "ch-charge-0006"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charge-0006",
+        "title": "Companies House charge 0006 for GAIL'S LIMITED",
+        "snippet": "Charge metadata is available, but description requires reviewed instrument text."
+      }
+    ],
+    "missing_information": [
+      "charge description has not been extracted from the reviewed charge instrument"
+    ],
+    "confidence": "low"
+  },
+  "secured_assets_unavailable": {
+    "answer": "The current dataroom does not contain a reviewed secured assets field for charge 0605 5393 0006. The underlying charge instrument text needs to be processed and reviewed before that field can be answered.",
+    "answer_type": "charges_security",
+    "field_intent": "secured_assets",
+    "resolved_charge_code": "060553930006",
+    "facts_used": [
+      {
+        "chargeCode": "060553930006",
+        "fieldIntent": "secured_assets",
+        "sourceId": "ch-charge-0006"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charge-0006",
+        "title": "Companies House charge 0006 for GAIL'S LIMITED",
+        "snippet": "Charge metadata is available, but secured assets require reviewed instrument text."
+      }
+    ],
+    "missing_information": [
+      "secured assets has not been extracted from the reviewed charge instrument"
+    ],
+    "confidence": "low"
+  },
+  "charge_created_date_0006": {
+    "answer": "Charge 0605 5393 0006 was created on 2022-06-06.",
+    "answer_type": "charges_security",
+    "field_intent": "charge_created_date",
+    "resolved_charge_code": "060553930006",
+    "facts_used": [
+      {
+        "chargeCode": "060553930006",
+        "fieldIntent": "charge_created_date",
+        "sourceId": "ch-charge-0006"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charge-0006",
+        "title": "Companies House charge 0006 for GAIL'S LIMITED",
+        "snippet": "Charge code 060553930006; created date: 2022-06-06."
+      }
+    ],
+    "missing_information": [],
+    "confidence": "high"
+  },
+  "charge_year_resolution_2021": {
+    "answer": "The current dataroom does not contain a reviewed charge description for charge 0605 5393 0005. The underlying charge instrument text needs to be processed and reviewed before that field can be answered.",
+    "answer_type": "charges_security",
+    "field_intent": "charge_description",
+    "resolved_charge_code": "060553930005",
+    "facts_used": [
+      {
+        "chargeCode": "060553930005",
+        "fieldIntent": "charge_description",
+        "sourceId": "ch-charge-0005"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charge-0005",
+        "title": "Companies House charge 0005 for GAIL'S LIMITED",
+        "snippet": "Charge code 060553930005 was created in 2021; description requires reviewed instrument text."
+      }
+    ],
+    "missing_information": [
+      "charge description has not been extracted from the reviewed charge instrument"
+    ],
+    "confidence": "low"
+  },
+  "no_generic_answer_for_specific_charge_field": {
+    "answer": "The current dataroom does not contain a reviewed charge description for charge 0605 5393 0006. The underlying charge instrument text needs to be processed and reviewed before that field can be answered.",
+    "answer_type": "charges_security",
+    "field_intent": "charge_description",
+    "resolved_charge_code": "060553930006",
+    "facts_used": [
+      {
+        "chargeCode": "060553930006",
+        "fieldIntent": "charge_description",
+        "sourceId": "ch-charge-0006"
+      }
+    ],
+    "citations": [
+      {
+        "source_id": "ch-charge-0006",
+        "title": "Companies House charge 0006 for GAIL'S LIMITED",
+        "snippet": "Charge code 060553930006 was created in 2022; description requires reviewed instrument text."
+      }
+    ],
+    "missing_information": [
+      "charge description has not been extracted from the reviewed charge instrument"
+    ],
     "confidence": "low"
   }
 }

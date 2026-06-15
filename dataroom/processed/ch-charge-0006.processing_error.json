@@ -1,0 +1,9 @@
+{
+  "source_id": "ch-charge-0006",
+  "page": null,
+  "title": "Registration of charge 060553930006 created 6 June 2022",
+  "category": "charges",
+  "issuer": "Companies House",
+  "retrieved_at": "2026-06-15T10:42:17Z",
+  "error": "Raw charge instrument is missing at dataroom/raw/companies_house/ch-charge-0006.pdf; place the PDF/text file there before legal-field extraction."
+}

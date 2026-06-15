@@ -3,7 +3,7 @@
 import { AlertCircle, Bot, Loader2, Pencil, Send, UserRound } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { askDataroom } from "@/lib/api";
-import { confidenceLabel, missingInformationLabel } from "@/lib/display-labels";
+import { confidenceLabel, displayChargeFieldIntent, displayLabel, missingInformationLabel } from "@/lib/display-labels";
 import type { AskResponse, Citation, InspectionState, ReviewedFact } from "@/lib/types";
 import { SourceCard } from "./source-card";
 
@@ -22,6 +22,8 @@ type Message = {
   citations?: Citation[];
   missingInformation?: string[];
   confidence?: string;
+  fieldIntent?: string;
+  resolvedChargeCode?: string;
 };
 
 const initialMessage: Message = {
@@ -87,6 +89,8 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
       const citations: Citation[] = response.citations ?? [];
       const missingInformation = response.missing_information ?? response.missingInformation ?? [];
       const reviewedFacts: ReviewedFact[] = response.facts_used ?? response.factsUsed ?? [];
+      const fieldIntent = response.field_intent ?? response.fieldIntent;
+      const resolvedChargeCode = response.resolved_charge_code ?? response.resolvedChargeCode;
 
       setMessages((current) => [
         ...current,
@@ -96,14 +100,18 @@ export function ChatPanel({ onInspectionUpdate, onOpenInspector }: ChatPanelProp
           content: response.answer,
           citations,
           missingInformation,
-          confidence: response.confidence
+          confidence: response.confidence,
+          fieldIntent,
+          resolvedChargeCode
         }
       ]);
       onInspectionUpdate?.({
         citations,
         reviewedFacts,
         missingInformation,
-        confidence: response.confidence
+        confidence: response.confidence,
+        fieldIntent,
+        resolvedChargeCode
       });
     } catch (requestError) {
       setError(
@@ -291,6 +299,22 @@ function ChatMessage({
               ))}
             </ul>
           </div>
+        ) : null}
+        {isAssistant && (message.fieldIntent || message.resolvedChargeCode) ? (
+          <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/56">
+            {message.fieldIntent ? (
+              <div className="flex gap-1">
+                <dt>{displayLabel("fieldIntent")}:</dt>
+                <dd className="font-medium text-ink/70">{displayChargeFieldIntent(message.fieldIntent)}</dd>
+              </div>
+            ) : null}
+            {message.resolvedChargeCode ? (
+              <div className="flex gap-1">
+                <dt>{displayLabel("resolvedChargeCode")}:</dt>
+                <dd className="font-medium text-ink/70">{message.resolvedChargeCode}</dd>
+              </div>
+            ) : null}
+          </dl>
         ) : null}
         {message.citations?.length ? (
           <div className="mt-3">

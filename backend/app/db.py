@@ -94,11 +94,16 @@ def seed_database() -> None:
                 1 if fact.get("reviewed") else 0,
                 1 if fact.get("usedInAnswers") else 0,
             ))
-        for charge in [
-          ("0605 5393 0006", "2022-06-06", "outstanding", "Glas Trust Corporation Limited", "ch-charge-0006"),
-          ("0605 5393 0005", "2021-11-04", "outstanding", "Glas Trust Corporation Limited", "ch-charge-0005"),
-        ]:
-            conn.execute("INSERT INTO charges VALUES (?, ?, ?, ?, ?, ?, ?)", (*charge, None, "Companies House charges metadata records this charge as outstanding and held by Glas Trust Corporation Limited."))
+        for charge in _load_charge_facts():
+            conn.execute("INSERT INTO charges VALUES (?, ?, ?, ?, ?, ?, ?)", (
+                charge.get("displayChargeCode") or charge["chargeCode"],
+                charge["createdDate"],
+                charge["status"],
+                charge["holder"],
+                charge["sourceId"],
+                charge.get("sourcePage"),
+                charge["sourceQuote"],
+            ))
         for officer in [
           ("Nicholas John Ayerst", "Director", "2025-07-07", None, "current"),
           ("Thomas Ralph Molnar", "Director", None, None, "current"),
@@ -121,6 +126,15 @@ def seed_database() -> None:
 
 def _load_financial_facts() -> list[dict]:
     path = PROJECT_ROOT / "backend" / "data" / "financial_facts.json"
+    if not path.exists():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    facts = payload.get("facts", payload)
+    return facts if isinstance(facts, list) else []
+
+
+def _load_charge_facts() -> list[dict]:
+    path = PROJECT_ROOT / "backend" / "data" / "charge_facts.json"
     if not path.exists():
         return []
     payload = json.loads(path.read_text(encoding="utf-8"))

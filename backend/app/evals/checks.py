@@ -18,6 +18,14 @@ APPROXIMATE_WORDS = {
     "roughly",
 }
 MONEY_RE = re.compile(r"(?:£|GBP\s*)\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s*(?:m|million|bn|billion)", re.I)
+UNAVAILABLE_RE = re.compile(r"\b(?:unavailable|not available|does not contain|no reviewed|cannot answer)\b", re.I)
+GENERIC_CHARGE_LIST_RE = re.compile(
+    r"\b(?:two|2)\s+(?:outstanding\s+)?charges\b|"
+    r"\bcharges?\s+(?:are\s+)?registered\b|"
+    r"\b0605\s*5393\s*0005\b.*\b0605\s*5393\s*0006\b|"
+    r"\b0005\b.*\b0006\b",
+    re.I | re.S,
+)
 
 
 class EvalFailure(Exception):
@@ -113,6 +121,10 @@ def evaluate_case(case: dict, response: dict, manifest_source_ids: set[str]) -> 
     for metric_rule in expected.get("financial_metrics", []):
         failures.extend(validate_financial_metric(metric_rule, answer, answer_type, facts_used, citations, missing_information))
 
+    charge_rule = expected.get("charge_field")
+    if isinstance(charge_rule, dict):
+        failures.extend(validate_charge_field(charge_rule, response, answer, answer_type, citations, missing_information, manifest_source_ids))
+
     return failures
 
 
@@ -195,3 +207,54 @@ def fact_value_matches(value: object, expected_decimal: Decimal, expected_minor_
 
 def format_gbp(value: Decimal) -> str:
     return "£" + f"{value:,.0f}" if value == value.to_integral() else "£" + f"{value:,.2f}"
+
+
+def validate_charge_field(
+    rule: dict,
+    response: dict,
+    answer: str,
+    answer_type: str,
+    citations: list[dict],
+    missing_information: list[str],
+    manifest_source_ids: set[str],
+) -> list[str]:
+    failures: list[str] = []
+    if answer_type not in {"charges", "charges_security", "structured"}:
+        failures.append(f"charge field answer_type {answer_type!r} is not a charge answer")
+
+    expected_intent = rule.get("field_intent")
+    if expected_intent and response.get("field_intent") != expected_intent:
+        failures.append(f"field_intent {response.get('field_intent')!r} != {expected_intent!r}")
+
+    expected_code = normalize_charge_code(rule.get("resolved_charge_code"))
+    if expected_code:
+        actual_code = normalize_charge_code(response.get("resolved_charge_code"))
+        if actual_code != expected_code:
+            failures.append(f"resolved_charge_code {actual_code!r} != {expected_code!r}")
+
+    for fragment in rule.get("must_contain", []):
+        if fragment.lower() not in answer.lower():
+            failures.append(f"charge answer missing required text {fragment!r}")
+
+    if rule.get("requires_unavailable"):
+        missing_text = " ".join(str(item) for item in missing_information)
+        if not (UNAVAILABLE_RE.search(answer) or UNAVAILABLE_RE.search(missing_text)):
+            failures.append("unavailable charge field must explicitly say unavailable/not reviewed")
+        if not missing_information:
+            failures.append("unavailable charge field must populate missing_information")
+
+    if rule.get("forbid_generic_charge_list") and GENERIC_CHARGE_LIST_RE.search(answer):
+        if not rule.get("requires_unavailable") or not UNAVAILABLE_RE.search(answer):
+            failures.append("specific charge field answer fell back to a generic charge list")
+
+    source_id = rule.get("expected_source_id")
+    if source_id:
+        failures.extend(validate_citations(citations, manifest_source_ids))
+        if not any((citation.get("source_id") or citation.get("source_document_id")) == source_id for citation in citations):
+            failures.append(f"charge answer missing citation to {source_id!r}")
+
+    return failures
+
+
+def normalize_charge_code(value: object) -> str:
+    return "".join(ch for ch in str(value or "") if ch.isdigit())

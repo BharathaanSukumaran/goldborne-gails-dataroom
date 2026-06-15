@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "dataroom" / "manifest.json"
 MANIFEST_SCHEMA_PATH = ROOT / "dataroom" / "manifest.schema.json"
 SAMPLE_RESPONSES_PATH = ROOT / "backend" / "app" / "evals" / "sample_responses.json"
+GOLDEN_CASES_PATH = ROOT / "backend" / "app" / "evals" / "golden_cases.json"
 
 RAW_LABEL_SCRIPT = ROOT / "scripts" / "check_frontend_display_labels.mjs"
 BACKEND_PYTHON = ROOT / "backend" / ".venv" / "bin" / "python"
@@ -56,6 +57,15 @@ VALID_PROCESSING_STATUSES = {
     "processing_failed",
 }
 VALID_SOURCE_STATUSES = {"pending", "processed", "verified"}
+REQUIRED_CHARGE_EVAL_CASE_IDS = {
+    "charge_holder_0006",
+    "charge_status_0005",
+    "charge_description_unavailable",
+    "secured_assets_unavailable",
+    "charge_created_date_0006",
+    "charge_year_resolution_2021",
+    "no_generic_answer_for_specific_charge_field",
+}
 
 CHECK_COMMANDS: dict[str, list[str]] = {
     "backend pytest": [PYTHON, "-m", "pytest", "backend/tests"],
@@ -82,6 +92,7 @@ def main() -> int:
             *CHECK_COMMANDS.keys(),
             "manifest validation",
             "secret scan",
+            "charge eval coverage",
         ],
         help="Run only the named check. May be provided more than once.",
     )
@@ -99,6 +110,9 @@ def main() -> int:
 
     if not selected or "manifest validation" in selected:
         failures.extend(run_python_check("manifest validation", validate_manifest))
+
+    if not selected or "charge eval coverage" in selected:
+        failures.extend(run_python_check("charge eval coverage", validate_charge_eval_coverage))
 
     if not selected or "secret scan" in selected:
         failures.extend(run_python_check("secret scan", scan_for_secrets))
@@ -228,6 +242,29 @@ def source_status_for(processing_status: str) -> str:
     if processing_status == "processed":
         return "processed"
     return "pending"
+
+
+def validate_charge_eval_coverage() -> list[str]:
+    failures: list[str] = []
+    try:
+        golden = json.loads(GOLDEN_CASES_PATH.read_text(encoding="utf-8"))
+        samples = json.loads(SAMPLE_RESPONSES_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 - report parse and file errors uniformly.
+        return [f"could not read charge eval files: {exc}"]
+
+    case_items = golden.get("cases") if isinstance(golden, dict) else golden
+    case_ids = {case.get("id") for case in case_items or [] if isinstance(case, dict)}
+    sample_ids = set(samples) if isinstance(samples, dict) else set()
+
+    missing_cases = sorted(REQUIRED_CHARGE_EVAL_CASE_IDS - case_ids)
+    if missing_cases:
+        failures.append("golden cases missing required charge evals: " + ", ".join(missing_cases))
+
+    missing_samples = sorted(REQUIRED_CHARGE_EVAL_CASE_IDS - sample_ids)
+    if missing_samples:
+        failures.append("sample responses missing required charge evals: " + ", ".join(missing_samples))
+
+    return failures
 
 
 def safe_repo_path(value: object) -> Path | None:

@@ -12,6 +12,7 @@ Current honesty check: the dataroom has source coverage and structured answer pa
 - Uses `dataroom/manifest.json` as the source registry for public filings and curated public context.
 - Routes exact financial questions through reviewed structured facts before any narrative synthesis.
 - Routes charges, ownership, and management questions through structured records and cited sources.
+- Applies field-level review gates for charge facts, so reviewed metadata can be answered while unreviewed instrument-derived fields stay unavailable.
 - Uses manifest-backed retrieval for narrative questions such as business, ownership, and credit context.
 - Uses OpenAI server-side only, when configured, for grounded synthesis over retrieved evidence.
 - Refuses unsupported questions and missing financial values instead of inventing numbers.
@@ -109,6 +110,29 @@ python3 scripts/review_financial_facts.py review-decisions.json
 
 The review script does not auto-approve facts. It also rejects approvals without a value, page, and quote.
 
+## Field-Aware Charge QA
+
+Charge answers use structured facts before retrieval or synthesis. The current charge fact file records Companies House charge metadata with a per-field `fieldReview` map, so each answerable field must be reviewed independently rather than inheriting approval from the charge record as a whole.
+
+For charge `0605 5393 0006`, the reviewed metadata currently supports:
+
+- holder/person entitled: Glas Trust Corporation Limited;
+- created date: `2022-06-06`;
+- status: outstanding;
+- charge code and short code.
+
+The dataroom does not currently contain reviewed charge descriptions, short particulars, secured assets, security type, obligations secured, or instrument summaries for charge `0006` or `0005`. Questions about those fields must return unavailable and explain that the underlying charge instrument text needs to be processed and reviewed before the field can be answered.
+
+Useful demo questions:
+
+```text
+Who holds charge 0006?
+What is the description/assets?
+When was charge 0006 created?
+```
+
+Expected behavior: the holder and created-date questions return cited structured answers for charge `0605 5393 0006`; the description/assets question returns a field-specific unavailable response, not a generic charge list and not an invented security package.
+
 ## Why Financial Values Are Unavailable
 
 The public dataroom currently lacks reviewed, answer-approved financial facts. The latest parent accounts are present in the manifest, but the PDF text/table extraction has not produced usable reviewed values. Because of that:
@@ -176,6 +200,15 @@ curl http://localhost:8000/sources
 curl -X POST http://localhost:8000/ask \
   -H "Content-Type: application/json" \
   -d '{"question":"What charges are registered against the company and who holds them?"}'
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Who holds charge 0006?"}'
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is the description/assets?"}'
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"When was charge 0006 created?"}'
 ```
 
 ## OpenAI Use
@@ -187,6 +220,7 @@ OpenAI is optional and server-side:
 - `OPENAI_MODEL` selects the synthesis model.
 - If the key is missing or synthesis is disabled, the API returns a deterministic retrieved-snippet fallback or a clear unavailable/configuration response.
 - Exact financial figures, lenders, directors, ownership, charges, and dates must be supported by structured facts or retrieved citations.
+- Charge description, secured-assets, and instrument-summary answers require reviewed instrument-derived fields; metadata review alone is not enough.
 
 Do not set `OPENAI_API_KEY` in `frontend/.env.local`, do not prefix it with `NEXT_PUBLIC_`, and do not call OpenAI from browser code.
 
@@ -295,6 +329,7 @@ The script checks the homepage, `/api/health`, `/api/sources`, normal `/api/ask`
 - `/api/sources` returns nonzero sources and indexed sources.
 - `/api/ask` returns cited evidence where the dataroom supports the answer.
 - Financial questions with no reviewed usable facts return unavailable and do not include invented numbers.
+- Charge description and secured-asset questions return unavailable unless those specific fields have been extracted from the charge instrument and reviewed.
 - `OPENAI_API_KEY` exists only in backend/Netlify server environment variables.
 - `USE_OPENAI_SYNTHESIS` is intentionally set for the deployment mode.
 - `.env` and `frontend/.env.local` are not committed.
@@ -304,6 +339,7 @@ The script checks the homepage, `/api/health`, `/api/sources`, normal `/api/ask`
 
 - The latest three parent consolidated accounts are registered, but PDF processing currently fails into explicit processing-error records.
 - There are currently `0` reviewed usable financial facts, so exact revenue, EBITDA, debt, cash, and profit answers are unavailable.
+- Charge metadata is field-reviewed, but charge descriptions, secured assets, and instrument summaries are unavailable until the underlying charge instrument text is processed and reviewed.
 - Curated public-news sources are intentionally lightweight and should be expanded with licensing-safe excerpts before broader use.
 - The review workflow is CLI-based rather than a full human review UI.
 - OpenAI synthesis is optional; without server-side configuration, narrative answers fall back to deterministic retrieval or unavailable responses.

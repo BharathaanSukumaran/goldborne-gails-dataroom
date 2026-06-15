@@ -25,6 +25,10 @@ export type AskResponse = {
   missingInformation?: string[];
   missing_information?: string[];
   confidence?: "low" | "medium" | "high" | string;
+  fieldIntent?: string;
+  field_intent?: string;
+  resolvedChargeCode?: string;
+  resolved_charge_code?: string;
 };
 
 export type ReviewedFact = Record<string, unknown>;
@@ -34,6 +38,8 @@ export type InspectionState = {
   reviewedFacts: ReviewedFact[];
   missingInformation: string[];
   confidence?: string;
+  fieldIntent?: string;
+  resolvedChargeCode?: string;
 };
 
 export type Source = {

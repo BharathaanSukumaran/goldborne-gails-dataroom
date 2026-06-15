@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
-from .config import MANIFEST_PATH
+from .config import MANIFEST_PATH, PROJECT_ROOT
 from .db import db_path, rows, seed_database
 from .facts.answers import build_financial_answer
 from .facts.repository import FinancialFactsRepository
@@ -15,6 +16,73 @@ from .retrieval.search import DocumentChunk, LocalKeywordSearchBackend, filter_m
 from .schemas import AskRequest, EvalCaseResult, EvalRunResponse, StructuredAnswer, Citation
 
 app = FastAPI(title="Goldborne Gail's Dataroom API", version="0.1.0")
+
+CHARGE_TOPIC_TERMS = ("charge", "charges", "security", "lender", "persons entitled")
+CHARGE_FIELD_TERMS = (
+    "holder",
+    "holds",
+    "held by",
+    "person entitled",
+    "persons entitled",
+    "lender",
+    "status",
+    "created",
+    "registered",
+    "outstanding",
+    "satisfied",
+    "description",
+    "short particulars",
+    "particulars",
+    "assets",
+    "secured",
+    "property charged",
+    "fixed",
+    "floating",
+    "obligations",
+    "instrument",
+    "debenture",
+)
+
+CHARGE_FACTS_PATH = PROJECT_ROOT / "backend" / "data" / "charge_facts.json"
+CHARGE_FIELD_LABELS = {
+    "list_charges": "registered charges",
+    "charge_holder": "charge holder",
+    "charge_status": "charge status",
+    "charge_created_date": "charge created date",
+    "charge_delivered_date": "charge delivered date",
+    "charge_satisfied_date": "charge satisfied date",
+    "charge_description": "charge description",
+    "charge_short_particulars": "short particulars",
+    "secured_assets": "secured assets",
+    "security_type": "security type",
+    "obligations_secured": "obligations secured",
+    "charge_instrument_summary": "charge instrument summary",
+    "charge_document_lookup": "charge instrument text",
+    "unknown_charge_field": "charge field",
+}
+CHARGE_FIELD_TO_FACT_KEY = {
+    "charge_holder": "holder",
+    "charge_status": "status",
+    "charge_created_date": "createdDate",
+    "charge_delivered_date": "deliveredDate",
+    "charge_satisfied_date": "satisfiedDate",
+    "charge_description": "description",
+    "charge_short_particulars": "shortParticulars",
+    "secured_assets": "securedAssets",
+    "security_type": "securityType",
+    "obligations_secured": "obligationsSecured",
+    "charge_instrument_summary": "instrumentSummary",
+    "charge_document_lookup": "instrumentSummary",
+}
+LEGAL_FIELD_INTENTS = {
+    "charge_description",
+    "charge_short_particulars",
+    "secured_assets",
+    "security_type",
+    "obligations_secured",
+    "charge_instrument_summary",
+    "charge_document_lookup",
+}
 
 @app.on_event("startup")
 def startup() -> None:
@@ -75,10 +143,10 @@ def answer_question(question: str) -> StructuredAnswer:
             confidence="low",
         )
     q = question.lower()
+    if is_charge_question(q):
+        return answer_charges(question)
     if any(term in q for term in ["revenue", "ebitda", "debt", "borrowings"]):
         return answer_financial(question)
-    if any(term in q for term in ["charge", "charges", "security", "lender"]):
-        return answer_charges()
     if any(term in q for term in ["director", "directors", "management", "officer"]):
         return answer_directors()
     if any(term in q for term in ["owner", "ownership", "psc", "ultimate"]):
@@ -135,19 +203,209 @@ def answer_financial(question: str) -> StructuredAnswer:
         confidence=payload.get("confidence", "low"),
     )
 
-def answer_charges() -> StructuredAnswer:
-    charges = rows("SELECT * FROM charges ORDER BY created_date DESC")
-    if not charges:
+def is_charge_question(q: str) -> bool:
+    if any(term in q for term in CHARGE_TOPIC_TERMS):
+        return True
+    has_charge_field_intent = any(term in q for term in CHARGE_FIELD_TERMS)
+    has_charge_reference = bool(_charge_reference_tokens(q))
+    return has_charge_field_intent and has_charge_reference
+
+def _charge_reference_tokens(q: str) -> set[str]:
+    tokens: set[str] = set()
+    compact = "".join(ch for ch in q if ch.isalnum())
+    for suffix in ("0005", "0006"):
+        if suffix in q or f"06055393{suffix}" in compact:
+            tokens.add(suffix)
+    for year in ("2021", "2022"):
+        if year in q:
+            tokens.add(year)
+    if "latest" in q or "newest" in q or "most recent" in q:
+        tokens.add("latest")
+    if "outstanding" in q or "unsatisfied" in q:
+        tokens.add("outstanding")
+    return tokens
+
+def _resolve_charge_rows(question: str, charges: list[dict]) -> list[dict]:
+    reference = resolve_charge_reference(question, charges)
+    if reference is not None:
+        return [reference]
+    return charges
+
+
+def load_charge_facts() -> list[dict]:
+    if CHARGE_FACTS_PATH.exists():
+        payload = json.loads(CHARGE_FACTS_PATH.read_text(encoding="utf-8"))
+        facts = payload.get("charges", payload)
+        if isinstance(facts, list):
+            return [fact for fact in facts if isinstance(fact, dict)]
+    return [
+        {
+            "workspaceId": "gails-limited",
+            "chargeCode": charge["charge_code"].replace(" ", ""),
+            "displayCode": charge["charge_code"],
+            "shortCode": charge["charge_code"].replace(" ", "")[-4:],
+            "createdDate": charge["created_date"],
+            "status": charge["status"],
+            "holder": charge["holder"],
+            "sourceId": charge["source_document_id"],
+            "sourcePage": charge["source_page"],
+            "sourceQuote": charge["source_quote"],
+            "reviewed": True,
+            "fieldReview": {"holder": True, "createdDate": True, "status": True},
+        }
+        for charge in rows("SELECT * FROM charges ORDER BY created_date DESC")
+    ]
+
+
+def answer_charges(question: str = "") -> StructuredAnswer:
+    facts = sorted(load_charge_facts(), key=lambda fact: str(fact.get("createdDate") or ""), reverse=True)
+    if not facts:
         return StructuredAnswer(answer="I cannot identify registered charges from the dataroom.", answer_type="unknown", missing_information=["charges"], confidence="low")
-    parts=[]; used=[]; cites=[]
-    for ch in charges:
-        parts.append(f"Charge {ch['charge_code']} was created on {ch['created_date']}; status {ch['status']}; holder/person entitled: {ch['holder']}.")
-        used.append(dict(ch))
-        src = source_by_id(ch["source_document_id"])
+    field_intent = detect_charge_field_intent(question)
+    charge = resolve_charge_reference(question, facts)
+    if field_intent == "list_charges":
+        return answer_charge_list(facts)
+    if charge is None:
+        return answer_missing_charge_reference(field_intent, facts)
+    fact_key = CHARGE_FIELD_TO_FACT_KEY.get(field_intent)
+    if fact_key and charge_field_is_reviewed(charge, fact_key) and charge.get(fact_key) not in (None, ""):
+        return answer_reviewed_charge_field(charge, field_intent, fact_key)
+    return answer_unavailable_charge_field(charge, field_intent)
+
+
+def detect_charge_field_intent(question: str) -> str:
+    q = question.lower()
+    if any(term in q for term in ["what charges", "which charges", "registered charges", "list charges", "charges registered", "charges are registered", "lenders or charges"]):
+        return "list_charges"
+    if any(term in q for term in ["who holds", "holder", "held by", "person entitled", "persons entitled", "lender", "security trustee"]):
+        return "charge_holder"
+    if any(term in q for term in ["status", "outstanding", "satisfied"]):
+        return "charge_status"
+    if any(term in q for term in ["when", "created", "creation date", "dated"]):
+        return "charge_created_date"
+    if "delivered" in q:
+        return "charge_delivered_date"
+    if "satisfied" in q or "satisfaction" in q:
+        return "charge_satisfied_date"
+    if any(term in q for term in ["short particulars", "particulars", "property charged", "charged property"]):
+        return "charge_short_particulars"
+    if any(term in q for term in ["assets", "secured asset", "covered", "cover", "all assets", "undertaking", "bank accounts", "shares", "real estate", "intellectual property"]):
+        return "secured_assets"
+    if any(term in q for term in ["fixed", "floating", "security type", "type of security"]):
+        return "security_type"
+    if any(term in q for term in ["obligations", "secured obligations", "liabilities secured"]):
+        return "obligations_secured"
+    if any(term in q for term in ["instrument", "debenture", "what does the charge say", "charge document"]):
+        return "charge_instrument_summary"
+    if "description" in q:
+        return "charge_description"
+    return "list_charges"
+
+
+def resolve_charge_reference(question: str, charges: list[dict]) -> dict | None:
+    q = question.lower()
+    compact_q = "".join(ch for ch in q if ch.isalnum())
+    for charge in charges:
+        code = str(charge.get("chargeCode") or charge.get("charge_code") or "").lower().replace(" ", "")
+        display = str(charge.get("displayCode") or "").lower().replace(" ", "")
+        short = str(charge.get("shortCode") or code[-4:]).lower()
+        if code and code in compact_q:
+            return charge
+        if display and display in compact_q:
+            return charge
+        if short and re.search(rf"(?<!\d){re.escape(short)}(?!\d)", q):
+            return charge
+    for charge in charges:
+        year = str(charge.get("createdDate") or charge.get("created_date") or "")[:4]
+        if year and year in q:
+            return charge
+    if "latest" in q or "newest" in q or "most recent" in q:
+        return charges[0]
+    if len(charges) == 1:
+        return charges[0]
+    return None
+
+
+def answer_charge_list(facts: list[dict]) -> StructuredAnswer:
+    used=[]; cites=[]; parts=[]
+    for fact in facts:
+        src = source_by_id(str(fact.get("sourceId")))
         if src is None:
-            return unknown_answer([f"manifest source {ch['source_document_id']}"], "I cannot answer charges because the supporting source is not in the manifest.")
-        cites.append(citation(src, ch["source_quote"], ch["source_page"]))
-    return StructuredAnswer(answer=" ".join(parts), answer_type="charges_security", facts_used=used, citations=cites, confidence="high")
+            return unknown_answer([f"manifest source {fact.get('sourceId')}"], "I cannot answer charges because the supporting source is not in the manifest.")
+        code = fact.get("displayCode") or fact.get("chargeCode")
+        parts.append(f"Charge {code} was created on {fact.get('createdDate')}; status {fact.get('status')}; holder/person entitled: {fact.get('holder')}.")
+        used.append(charge_fact_payload(fact, "list_charges"))
+        cites.append(citation(src, str(fact.get("sourceQuote") or ""), fact.get("sourcePage")))
+    return StructuredAnswer(answer=" ".join(parts), answer_type="charges_security", facts_used=used, citations=cites, confidence="high", field_intent="list_charges")
+
+
+def answer_reviewed_charge_field(charge: dict, field_intent: str, fact_key: str) -> StructuredAnswer:
+    src = source_by_id(str(charge.get("sourceId")))
+    if src is None:
+        return unknown_answer([f"manifest source {charge.get('sourceId')}"], "I cannot answer charges because the supporting source is not in the manifest.")
+    value = charge.get(fact_key)
+    code = charge.get("displayCode") or charge.get("chargeCode")
+    if field_intent == "charge_holder":
+        answer = f"Charge {code} is listed with {value} as the person entitled / charge holder."
+    elif field_intent == "charge_status":
+        answer = f"Charge {code} was created on {charge.get('createdDate')} and is listed as {value}."
+    elif field_intent == "charge_created_date":
+        answer = f"Charge {code} was created on {value}."
+    else:
+        answer = f"The reviewed {CHARGE_FIELD_LABELS[field_intent]} for charge {code} is: {value}."
+    return StructuredAnswer(answer=answer, answer_type="charges_security", facts_used=[charge_fact_payload(charge, field_intent, fact_key)], citations=[citation(src, str(charge.get("sourceQuote") or ""), charge.get("sourcePage"))], confidence="high", field_intent=field_intent, resolved_charge_code=str(charge.get("chargeCode") or ""))
+
+
+def answer_unavailable_charge_field(charge: dict, field_intent: str) -> StructuredAnswer:
+    src = source_by_id(str(charge.get("sourceId")))
+    label = CHARGE_FIELD_LABELS.get(field_intent, "requested charge field")
+    code = charge.get("displayCode") or charge.get("chargeCode")
+    metadata = f"It does contain reviewed metadata showing charge {code} was created on {charge.get('createdDate')}, is {charge.get('status')}, and is held by {charge.get('holder')}."
+    if field_intent in LEGAL_FIELD_INTENTS:
+        answer = f"The current dataroom does not contain a reviewed {label} for charge {code}. {metadata} The underlying charge instrument text needs to be processed and reviewed before that field can be answered."
+        missing = [f"{label} has not been extracted from the reviewed charge instrument"]
+    else:
+        answer = f"The current dataroom does not contain a reviewed {label} for charge {code}."
+        missing = [f"{label} is not available in reviewed charge facts"]
+    cites = [citation(src, str(charge.get("sourceQuote") or ""), charge.get("sourcePage"))] if src else []
+    return StructuredAnswer(answer=answer, answer_type="charges_security", facts_used=[charge_fact_payload(charge, field_intent)], citations=cites, missing_information=missing, confidence="low", field_intent=field_intent, resolved_charge_code=str(charge.get("chargeCode") or ""))
+
+
+def answer_missing_charge_reference(field_intent: str, facts: list[dict]) -> StructuredAnswer:
+    label = CHARGE_FIELD_LABELS.get(field_intent, "requested charge field")
+    parts = [f"charge {fact.get('displayCode') or fact.get('chargeCode')} ({fact.get('createdDate')})" for fact in facts]
+    cites=[]
+    for fact in facts:
+        src = source_by_id(str(fact.get("sourceId")))
+        if src:
+            cites.append(citation(src, str(fact.get("sourceQuote") or ""), fact.get("sourcePage")))
+    if field_intent in LEGAL_FIELD_INTENTS:
+        answer = (
+            f"The current dataroom does not contain reviewed {label} fields for the registered charges in scope ({'; '.join(parts)}). "
+            "It only contains reviewed Companies House metadata for charge code, created date, status, and holder/person entitled; "
+            "the underlying charge instrument text needs to be processed and reviewed before that field can be answered."
+        )
+        missing = [f"{label} has not been extracted from the reviewed charge instrument"]
+    else:
+        answer = (
+            f"There are multiple registered charges in the dataroom ({'; '.join(parts)}). "
+            f"I cannot give a single grounded {label} answer without a specific charge reference."
+        )
+        missing = [f"Specify a charge code or year for {label}"]
+    return StructuredAnswer(answer=answer, answer_type="charges_security", facts_used=[charge_fact_payload(fact, field_intent) for fact in facts], citations=cites, missing_information=missing, confidence="low", field_intent=field_intent)
+
+
+def charge_field_is_reviewed(charge: dict, fact_key: str) -> bool:
+    review = charge.get("fieldReview") if isinstance(charge.get("fieldReview"), dict) else {}
+    return bool(charge.get("reviewed") and review.get(fact_key))
+
+
+def charge_fact_payload(charge: dict, field_intent: str, fact_key: str | None = None) -> dict:
+    payload = dict(charge)
+    payload["fieldIntent"] = field_intent
+    if fact_key:
+        payload["requestedField"] = fact_key
+    return payload
 
 def answer_directors() -> StructuredAnswer:
     officers = rows("SELECT * FROM officers WHERE status = 'current' ORDER BY name")

@@ -122,3 +122,77 @@ def test_filter_manifest_backed_chunks_drops_unknown_source_ids():
     backed = filter_manifest_backed_chunks(chunks, [{"source_id": "valid-source"}])
 
     assert [chunk.source_id for chunk in backed] == ["valid-source"]
+
+
+def test_local_search_boosts_exact_charge_code_matches():
+    chunks = [
+        DocumentChunk(
+            chunk_id="charge-0005:1",
+            source_id="ch-charge-0005",
+            title="Registration of charge 060553930005",
+            category="charges",
+            text="Charge 0605 5393 0005 is outstanding and held by Glas Trust Corporation Limited.",
+        ),
+        DocumentChunk(
+            chunk_id="charge-0006:1",
+            source_id="ch-charge-0006",
+            title="Registration of charge 060553930006",
+            category="charges",
+            text="Charge 0605 5393 0006 is outstanding and held by Glas Trust Corporation Limited.",
+        ),
+    ]
+
+    results = LocalKeywordSearchBackend(chunks).search("details for charge 060553930006", limit=2)
+
+    assert [chunk.source_id for chunk in results] == ["ch-charge-0006", "ch-charge-0005"]
+    assert results[0].score > results[1].score
+
+
+def test_local_search_boosts_exact_charge_source_id_matches():
+    chunks = [
+        DocumentChunk(
+            chunk_id="register:1",
+            source_id="ch-charges-register-06055393",
+            title="Companies House charges register",
+            category="charges",
+            text="Register of outstanding charges and persons entitled.",
+        ),
+        DocumentChunk(
+            chunk_id="charge-0005:1",
+            source_id="ch-charge-0005",
+            title="Registration of charge 060553930005",
+            category="charges",
+            text="Charge source for secured assets and obligations review.",
+        ),
+    ]
+
+    results = LocalKeywordSearchBackend(chunks).search("show ch-charge-0005 security source", limit=2)
+
+    assert results[0].source_id == "ch-charge-0005"
+
+
+def test_charge_field_synonyms_retrieve_charge_clauses_before_generic_assets():
+    chunks = [
+        DocumentChunk(
+            chunk_id="accounts:1",
+            source_id="accounts-2025",
+            title="Accounts",
+            category="financial_filings",
+            text="The balance sheet lists assets, liabilities, property, rights and obligations in narrative form.",
+        ),
+        DocumentChunk(
+            chunk_id="charge-0006:1",
+            source_id="ch-charge-0006",
+            title="Registration of charge 060553930006",
+            category="charges",
+            text=(
+                "Fields requiring underlying PDF review: description, short particulars, secured assets, "
+                "security type, fixed or floating charge classification, and obligations secured."
+            ),
+        ),
+    ]
+
+    response = search_docs("What are the short particulars and secured assets?", chunks=chunks, limit=2)
+
+    assert response.requires_structured_facts
+    assert response.chunks[0].source_id == "ch-charge-0006"

@@ -22,6 +22,8 @@ class StructuredAnswer(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     missing_information: list[str] = Field(default_factory=list)
     confidence: Literal["high", "medium", "low"] = "medium"
+    field_intent: str | None = None
+    resolved_charge_code: str | None = None
 
 class EvalCaseResult(BaseModel):
     question: str

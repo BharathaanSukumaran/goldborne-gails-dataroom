@@ -10,6 +10,38 @@ NUMERIC_CLAIM_RE = re.compile(r"(?<![A-Za-z0-9])(?:GBP|\u00a3)?\s*\d[\d,]*(?:\.\
 EBITDA_STATUSES = {"reported", "computed", "unknown", "unavailable"}
 STRICT_FINANCIAL_METRICS = {"revenue", "ebitda", "debt"}
 LENDER_CONTEXT_TERMS = {"charge", "charges", "security", "lender", "lenders", "holder", "person entitled"}
+CHARGE_ANSWER_TYPES = {"charges", "charges_security", "structured_charges"}
+CHARGE_FIELD_REQUEST_TERMS = {
+    "asset",
+    "assets",
+    "collateral",
+    "cover",
+    "covers",
+    "covered",
+    "description",
+    "describe",
+    "fixed charge",
+    "floating charge",
+    "secured over",
+    "security covers",
+    "security package",
+    "what security",
+}
+CHARGE_DESCRIPTIVE_TERMS = {
+    "asset",
+    "assets",
+    "collateral",
+    "debenture",
+    "description",
+    "fixed charge",
+    "fixed and floating",
+    "floating charge",
+    "property",
+    "secured over",
+    "security covers",
+    "security package",
+    "undertaking",
+}
 KNOWN_LENDER_NAMES = {
     "barclays",
     "barclays bank",
@@ -88,6 +120,7 @@ def answer_unknown_policy(question: str, *, has_covenant_data: bool = False) -> 
 def verify_answer(
     answer: Mapping[str, Any],
     *,
+    question: str | None = None,
     financial_facts: Iterable[Mapping[str, Any] | Any] = (),
     charges: Iterable[Mapping[str, Any] | Any] = (),
     manifest_sources: Iterable[Mapping[str, Any] | Any] = (),
@@ -103,6 +136,7 @@ def verify_answer(
     answer_dict = dict(answer)
     errors: list[str] = []
 
+    errors.extend(_missing_required_citations(answer_dict))
     errors.extend(_missing_citation_sources(answer_dict, manifest_sources))
     errors.extend(_unusable_financial_fact_errors(answer_dict, financial_facts))
     errors.extend(_unsupported_numeric_claims(answer_dict, financial_facts, charges))
@@ -110,6 +144,8 @@ def verify_answer(
     errors.extend(_unsupported_financial_facts_used(answer_dict, financial_facts))
     errors.extend(_unsupported_covenant_claims(answer_dict))
     errors.extend(_unsupported_lender_claims(answer_dict, charges))
+    errors.extend(_unsupported_charge_field_claims(answer_dict, charges))
+    errors.extend(_generic_charge_answer_for_specific_field(answer_dict, charges, question))
 
     if not errors:
         return VerificationResult(passed=True, answer=answer_dict)
@@ -122,6 +158,14 @@ def verify_answer(
         "missing_information": _merge_missing_information(answer_dict, errors),
     }
     return VerificationResult(passed=False, answer=blocked, errors=tuple(errors))
+
+
+def _missing_required_citations(answer: Mapping[str, Any]) -> list[str]:
+    if answer.get("answer_type") == "unknown":
+        return []
+    if answer.get("citations"):
+        return []
+    return ["answer requires citations resolving to manifest source_id"]
 
 
 def _missing_citation_sources(
@@ -354,6 +398,83 @@ def _unsupported_lender_claims(
     if not unsupported:
         return []
     return ["unsupported lender claim: " + ", ".join(unsupported)]
+
+
+def _unsupported_charge_field_claims(
+    answer: Mapping[str, Any],
+    charges: Iterable[Mapping[str, Any] | Any],
+) -> list[str]:
+    if answer.get("answer_type") == "unknown" or not _is_charge_answer(answer):
+        return []
+    if _is_charge_unavailable_answer(answer):
+        return []
+
+    answer_text = str(answer.get("answer") or "")
+    normalized_answer = answer_text.lower()
+    mentioned_terms = sorted(term for term in CHARGE_DESCRIPTIVE_TERMS if term in normalized_answer)
+    if not mentioned_terms:
+        return []
+
+    supported_text = _supported_charge_field_text(charges, answer.get("facts_used") or ())
+    unsupported = [term for term in mentioned_terms if term not in supported_text]
+    if not unsupported:
+        return []
+    return ["unsupported charge description/assets/security claim: " + ", ".join(unsupported)]
+
+
+def _generic_charge_answer_for_specific_field(
+    answer: Mapping[str, Any],
+    charges: Iterable[Mapping[str, Any] | Any],
+    question: str | None,
+) -> list[str]:
+    if answer.get("answer_type") == "unknown" or not _is_charge_answer(answer):
+        return []
+    if _is_charge_unavailable_answer(answer):
+        return []
+
+    question_text = str(question or answer.get("question") or "").lower()
+    if not any(term in question_text for term in CHARGE_FIELD_REQUEST_TERMS):
+        return []
+
+    supported_text = _supported_charge_field_text(charges, answer.get("facts_used") or ())
+    if any(term in supported_text for term in CHARGE_FIELD_REQUEST_TERMS | CHARGE_DESCRIPTIVE_TERMS):
+        return []
+    return ["generic charge-list answer for specific charge field request"]
+
+
+def _is_charge_unavailable_answer(answer: Mapping[str, Any]) -> bool:
+    if not answer.get("missing_information"):
+        return False
+    text = str(answer.get("answer") or "").lower()
+    return any(phrase in text for phrase in ("does not contain", "not available", "cannot answer", "cannot give"))
+
+
+def _is_charge_answer(answer: Mapping[str, Any]) -> bool:
+    answer_type = str(answer.get("answer_type") or "")
+    if answer_type in CHARGE_ANSWER_TYPES:
+        return True
+    answer_text = str(answer.get("answer") or "").lower()
+    return any(term in answer_text for term in LENDER_CONTEXT_TERMS)
+
+
+def _supported_charge_field_text(
+    charges: Iterable[Mapping[str, Any] | Any],
+    facts_used: Iterable[Mapping[str, Any] | Any],
+) -> str:
+    parts: list[str] = []
+    for charge in [*list(charges), *list(facts_used)]:
+        parts.extend(
+            str(value or "")
+            for value in (
+                _field(charge, "description"),
+                _field(charge, "classification"),
+                _field(charge, "assets"),
+                _field(charge, "asset_description"),
+                _field(charge, "security"),
+                _field(charge, "security_description"),
+            )
+        )
+    return " ".join(parts).lower()
 
 
 def _is_trusted_financial_fact(fact: Mapping[str, Any] | Any) -> bool:

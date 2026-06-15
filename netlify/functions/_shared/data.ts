@@ -70,6 +70,46 @@ export type FinancialFact = {
   usedInAnswers: boolean;
 };
 
+export type ChargeFieldReview = Record<
+  | "chargeCode"
+  | "shortCode"
+  | "createdDate"
+  | "deliveredDate"
+  | "status"
+  | "satisfiedDate"
+  | "holder"
+  | "description"
+  | "shortParticulars"
+  | "securedAssets"
+  | "securityType"
+  | "obligationsSecured"
+  | "instrumentSummary",
+  boolean
+>;
+
+export type ChargeFact = {
+  workspaceId: string;
+  chargeCode: string;
+  displayChargeCode?: string;
+  shortCode: string;
+  createdDate: string | null;
+  deliveredDate: string | null;
+  status: "outstanding" | "satisfied" | "part-satisfied" | "unknown";
+  satisfiedDate: string | null;
+  holder: string;
+  description: string | null;
+  shortParticulars: string | null;
+  securedAssets: string | null;
+  securityType: string | null;
+  obligationsSecured: string | null;
+  instrumentSummary: string | null;
+  sourceId: string;
+  sourcePage: number | null;
+  sourceQuote: string;
+  reviewed: boolean;
+  fieldReview: ChargeFieldReview;
+};
+
 const WORKSPACE_ID = "gails-limited";
 const PROJECT_ROOT = findProjectRoot();
 const MANIFEST_PATH = join(PROJECT_ROOT, "dataroom", "manifest.json");
@@ -102,26 +142,82 @@ export const financialFacts: FinancialFact[] = ["revenue", "EBITDA", "debt"].map
   usedInAnswers: false
 }));
 
-export const chargeFacts = [
+const embeddedChargeFacts: ChargeFact[] = [
   {
-    workspaceId: WORKSPACE_ID,
-    chargeCode: "0605 5393 0006",
-    createdDate: "2022-06-06",
-    status: "outstanding",
-    holder: "Glas Trust Corporation Limited",
-    sourceId: "ch-charge-0006",
-    sourceQuote: "Companies House charges metadata records this charge as outstanding and held by Glas Trust Corporation Limited."
+    "workspaceId": "gails-limited",
+    "chargeCode": "060553930006",
+    "displayChargeCode": "0605 5393 0006",
+    "shortCode": "0006",
+    "createdDate": "2022-06-06",
+    "deliveredDate": null,
+    "status": "outstanding",
+    "satisfiedDate": null,
+    "holder": "Glas Trust Corporation Limited",
+    "description": null,
+    "shortParticulars": null,
+    "securedAssets": null,
+    "securityType": null,
+    "obligationsSecured": null,
+    "instrumentSummary": null,
+    "sourceId": "ch-charge-0006",
+    "sourcePage": null,
+    "sourceQuote": "Companies House charges metadata records charge 0605 5393 0006 as outstanding, created on 2022-06-06, and held by Glas Trust Corporation Limited.",
+    "reviewed": true,
+    "fieldReview": {
+      "chargeCode": true,
+      "shortCode": true,
+      "createdDate": true,
+      "deliveredDate": false,
+      "status": true,
+      "satisfiedDate": true,
+      "holder": true,
+      "description": false,
+      "shortParticulars": false,
+      "securedAssets": false,
+      "securityType": false,
+      "obligationsSecured": false,
+      "instrumentSummary": false
+    }
   },
   {
-    workspaceId: WORKSPACE_ID,
-    chargeCode: "0605 5393 0005",
-    createdDate: "2021-11-04",
-    status: "outstanding",
-    holder: "Glas Trust Corporation Limited",
-    sourceId: "ch-charge-0005",
-    sourceQuote: "Companies House charges metadata records this charge as outstanding and held by Glas Trust Corporation Limited."
+    "workspaceId": "gails-limited",
+    "chargeCode": "060553930005",
+    "displayChargeCode": "0605 5393 0005",
+    "shortCode": "0005",
+    "createdDate": "2021-11-04",
+    "deliveredDate": null,
+    "status": "outstanding",
+    "satisfiedDate": null,
+    "holder": "Glas Trust Corporation Limited",
+    "description": null,
+    "shortParticulars": null,
+    "securedAssets": null,
+    "securityType": null,
+    "obligationsSecured": null,
+    "instrumentSummary": null,
+    "sourceId": "ch-charge-0005",
+    "sourcePage": null,
+    "sourceQuote": "Companies House charges metadata records charge 0605 5393 0005 as outstanding, created on 2021-11-04, and held by Glas Trust Corporation Limited.",
+    "reviewed": true,
+    "fieldReview": {
+      "chargeCode": true,
+      "shortCode": true,
+      "createdDate": true,
+      "deliveredDate": false,
+      "status": true,
+      "satisfiedDate": true,
+      "holder": true,
+      "description": false,
+      "shortParticulars": false,
+      "securedAssets": false,
+      "securityType": false,
+      "obligationsSecured": false,
+      "instrumentSummary": false
+    }
   }
 ];
+
+export const chargeFacts: ChargeFact[] = normalizeChargeFacts(embeddedChargeFacts);
 
 export const officerFacts = [
   { workspaceId: WORKSPACE_ID, name: "Nicholas John Ayerst", role: "Director", status: "current", sourceId: "ch-officers-06055393", sourceQuote: "Companies House officers metadata." },
@@ -144,9 +240,20 @@ export const ownershipFacts = [
 
 export const charges = chargeFacts.map((charge) => ({
   ...charge,
-  charge_code: charge.chargeCode,
+  charge_code: charge.displayChargeCode ?? charge.chargeCode,
+  charge_code_normalized: charge.chargeCode,
+  short_code: charge.shortCode,
   created_date: charge.createdDate,
+  delivered_date: charge.deliveredDate,
+  satisfied_date: charge.satisfiedDate,
+  short_particulars: charge.shortParticulars,
+  secured_assets: charge.securedAssets,
+  security_type: charge.securityType,
+  obligations_secured: charge.obligationsSecured,
+  instrument_summary: charge.instrumentSummary,
+  field_review: charge.fieldReview,
   source_id: charge.sourceId,
+  source_page: charge.sourcePage,
   source_quote: charge.sourceQuote
 }));
 
@@ -164,6 +271,21 @@ export const ownership = {
   source_id: ownershipFacts[0].sourceId,
   source_quote: ownershipFacts[0].sourceQuote
 };
+
+function normalizeChargeFacts(facts: ChargeFact[]): ChargeFact[] {
+  return facts.map((fact) => ({
+    ...fact,
+    workspaceId: fact.workspaceId || WORKSPACE_ID,
+    sourcePage: fact.sourcePage ?? null,
+    reviewed: fact.reviewed === true,
+    fieldReview: fact.fieldReview
+  }));
+}
+
+export function isChargeFieldAnswerable(fact: ChargeFact, field: keyof ChargeFieldReview): boolean {
+  const value = fact[field as keyof ChargeFact];
+  return fact.reviewed === true && fact.fieldReview[field] === true && value !== null && value !== undefined && value !== "";
+}
 
 export function loadManifest(): DataroomManifest {
   const raw = readFileSync(MANIFEST_PATH, "utf-8");
@@ -311,15 +433,116 @@ function chunkText(text: string, source: ManifestSource): string[] {
   return chunks.length ? chunks : [source.title];
 }
 
+const chargeQueryTerms = new Set([
+  "charge",
+  "charges",
+  "security",
+  "secured",
+  "collateral",
+  "lender",
+  "lenders",
+  "holder",
+  "holders",
+  "entitled",
+  "particulars",
+  "assets",
+  "obligation",
+  "obligations",
+  "fixed",
+  "floating",
+  "debenture",
+  "mortgage"
+]);
+
+const chargeFieldSynonyms = [
+  ["description", "described", "particulars", "short", "details", "instrument", "deed"],
+  ["short", "particulars", "description", "assets", "property", "undertaking", "fixed", "floating"],
+  ["secured", "assets", "asset", "collateral", "property", "undertaking", "receivables", "rights", "fixed", "floating"],
+  ["security", "type", "classification", "fixed", "floating", "debenture", "mortgage", "charge"],
+  ["obligation", "obligations", "liabilities", "indebtedness", "monies", "secured", "due", "covenants"],
+  ["holder", "holders", "lender", "lenders", "person", "persons", "entitled", "trustee"]
+];
+
 function scoreChunk(chunk: SourceChunk, queryTerms: string[]): number {
+  const weightedTerms = expandQueryTerms(queryTerms);
   const textTerms = tokenize(`${chunk.title} ${chunk.category} ${chunk.text}`);
   const counts = new Map<string, number>();
   for (const term of textTerms) counts.set(term, (counts.get(term) ?? 0) + 1);
-  return queryTerms.reduce((score, term) => score + (counts.get(term) ?? 0), 0);
+
+  let score = 0;
+  for (const [term, weight] of weightedTerms) {
+    score += (counts.get(term) ?? 0) * weight;
+  }
+  return score + chargeMatchBoost(chunk, queryTerms);
+}
+
+function expandQueryTerms(queryTerms: string[]): Map<string, number> {
+  const weighted = new Map<string, number>();
+  for (const term of queryTerms) weighted.set(term, 1);
+  const queryText = queryTerms.join(" ");
+  if (!isChargeQuery(queryTerms) && !extractChargeCodes(queryText).length && !sourceIdMentions(queryText).length) return weighted;
+
+  for (const synonyms of chargeFieldSynonyms) {
+    if (!synonyms.some((term) => queryTerms.includes(term))) continue;
+    for (const synonym of synonyms) weighted.set(synonym, Math.max(weighted.get(synonym) ?? 0, 0.7));
+  }
+  for (const term of ["charge", "charges", "security", "secured"]) {
+    weighted.set(term, Math.max(weighted.get(term) ?? 0, 1.2));
+  }
+  return weighted;
+}
+
+function chargeMatchBoost(chunk: SourceChunk, queryTerms: string[]): number {
+  const queryText = queryTerms.join(" ");
+  const chargeCodes = extractChargeCodes(queryText);
+  const sourceIds = sourceIdMentions(queryText);
+  if (!isChargeQuery(queryTerms) && !chargeCodes.length && !sourceIds.length) return 0;
+
+  const searchable = `${chunk.sourceId} ${chunk.title} ${chunk.category} ${chunk.text}`;
+  const searchableLower = searchable.toLowerCase();
+  const searchableCompact = compactIdentifier(searchable);
+  let score = 0;
+
+  for (const code of chargeCodes) {
+    if (!searchableCompact.includes(code)) continue;
+    score += 18;
+    if (chunk.sourceId.toLowerCase() === `ch-charge-${code.slice(-4)}`) score += 10;
+  }
+
+  for (const sourceId of sourceIds) {
+    if (sourceId === chunk.sourceId.toLowerCase()) score += 20;
+    else if (searchableLower.includes(sourceId)) score += 8;
+  }
+
+  if (chunk.category === "charges") score += 4;
+  else if (chunk.sourceId.toLowerCase().includes("charge")) score += 2;
+
+  for (const synonyms of chargeFieldSynonyms) {
+    if (synonyms.some((term) => queryTerms.includes(term)) && synonyms.some((term) => searchableLower.includes(term))) {
+      score += 2.5;
+    }
+  }
+  return score;
+}
+
+function isChargeQuery(queryTerms: string[]): boolean {
+  return queryTerms.some((term) => chargeQueryTerms.has(term));
+}
+
+function extractChargeCodes(value: string): string[] {
+  return compactIdentifier(value).match(/06055393\d{4}/g) ?? [];
+}
+
+function sourceIdMentions(value: string): string[] {
+  return value.toLowerCase().match(/ch-charge-\d{4}/g) ?? [];
+}
+
+function compactIdentifier(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function tokenize(value: string): string[] {
-  return value.toLowerCase().match(/[a-z0-9][a-z0-9&'_-]*/g) ?? [];
+  return value.toLowerCase().match(/[a-z0-9][a-z0-9&'._-]*/g) ?? [];
 }
 
 function findProjectRoot(): string {

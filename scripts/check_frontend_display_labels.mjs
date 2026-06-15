@@ -37,7 +37,11 @@ const rawLabels = [
   "source_status",
   "included_reason",
   "local_path",
-  "financial_facts"
+  "financial_facts",
+  "fieldIntent",
+  "field_intent",
+  "resolvedChargeCode",
+  "resolved_charge_code"
 ];
 
 const failures = [];

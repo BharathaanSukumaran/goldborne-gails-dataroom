@@ -20,6 +20,22 @@ const FIELD_LABELS: LabelDictionary = {
   included_reason: "Why included",
   local_path: "Local file",
   financial_facts: "Financial figures",
+  fieldIntent: "Requested field",
+  field_intent: "Requested field",
+  resolvedChargeCode: "Resolved charge",
+  resolved_charge_code: "Resolved charge",
+  list_charges: "Registered charges",
+  charge_holder: "Charge holder",
+  charge_status: "Charge status",
+  charge_created_date: "Creation date",
+  charge_delivered_date: "Delivery date",
+  charge_satisfied_date: "Satisfaction date",
+  charge_short_particulars: "Short particulars",
+  secured_assets: "Secured assets",
+  security_type: "Security type",
+  obligations_secured: "Obligations secured",
+  charge_instrument_summary: "Instrument summary",
+  charge_description: "Charge description",
   revenue: "Revenue",
   turnover: "Turnover",
   EBITDA: "EBITDA",
@@ -91,6 +107,11 @@ const MISSING_INFORMATION_LABELS: LabelDictionary = {
 export function displayLabel(key: unknown): string {
   if (key === null || key === undefined || key === "") return "";
   const value = String(key);
+  return FIELD_LABELS[value] ?? humanizeKey(value);
+}
+
+export function displayChargeFieldIntent(value: string | null | undefined): string {
+  if (!value) return "";
   return FIELD_LABELS[value] ?? humanizeKey(value);
 }
 

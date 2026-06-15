@@ -315,6 +315,8 @@ function parseModelJson(text: string): Record<string, unknown> | null {
 }
 
 function normalizeAnswerType(value: unknown, fallback: AnswerType): AnswerType {
+  if (fallback === "unknown") return "unknown";
+
   const allowed: AnswerType[] = ["financial_metric", "charges_security", "ownership_management", "credit_summary", "source_lookup", "unknown", "other"];
   return allowed.includes(value as AnswerType) ? value as AnswerType : fallback;
 }
